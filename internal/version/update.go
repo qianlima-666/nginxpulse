@@ -17,6 +17,7 @@ const (
 	githubRepo              = "nginxpulse"
 	githubAPITimeout        = 2500 * time.Millisecond
 	githubUpdateCacheTTL    = 6 * time.Hour
+	githubNoUpdateCacheTTL  = 15 * time.Minute
 	githubUpdateFailureTTL  = 45 * time.Minute
 	githubLatestReleaseURL  = "https://api.github.com/repos/" + githubOwner + "/" + githubRepo + "/releases/latest"
 	githubTagsAPIURL        = "https://api.github.com/repos/" + githubOwner + "/" + githubRepo + "/tags?per_page=100"
@@ -60,6 +61,14 @@ type parsedVersion struct {
 var latestVersionCache cachedLatestVersion
 
 func GetUpdateInfo() UpdateInfo {
+	return buildUpdateInfo(false)
+}
+
+func RefreshUpdateInfo() UpdateInfo {
+	return buildUpdateInfo(true)
+}
+
+func buildUpdateInfo(force bool) UpdateInfo {
 	info := UpdateInfo{
 		CurrentVersion: Version,
 	}
@@ -69,7 +78,7 @@ func GetUpdateInfo() UpdateInfo {
 		return info
 	}
 
-	latestVersion, latestURL := getLatestVersion()
+	latestVersion, latestURL := getLatestVersion(force)
 	if latestVersion == "" {
 		return info
 	}
@@ -80,13 +89,10 @@ func GetUpdateInfo() UpdateInfo {
 	return info
 }
 
-func getLatestVersion() (string, string) {
+func getLatestVersion(force bool) (string, string) {
 	latestVersionCache.mu.Lock()
-	ttl := githubUpdateCacheTTL
-	if latestVersionCache.latestVersion == "" {
-		ttl = githubUpdateFailureTTL
-	}
-	if !latestVersionCache.checkedAt.IsZero() && time.Since(latestVersionCache.checkedAt) < ttl {
+	ttl := getLatestVersionCacheTTL(latestVersionCache.latestVersion)
+	if !force && !latestVersionCache.checkedAt.IsZero() && time.Since(latestVersionCache.checkedAt) < ttl {
 		version := latestVersionCache.latestVersion
 		url := latestVersionCache.latestURL
 		latestVersionCache.mu.Unlock()
@@ -106,6 +112,18 @@ func getLatestVersion() (string, string) {
 	}
 
 	return latestVersionCache.latestVersion, latestVersionCache.latestURL
+}
+
+func getLatestVersionCacheTTL(latestVersion string) time.Duration {
+	trimmed := strings.TrimSpace(latestVersion)
+	switch {
+	case trimmed == "":
+		return githubUpdateFailureTTL
+	case compareVersions(trimmed, Version) > 0:
+		return githubUpdateCacheTTL
+	default:
+		return githubNoUpdateCacheTTL
+	}
 }
 
 func fetchLatestVersion() (string, string, error) {

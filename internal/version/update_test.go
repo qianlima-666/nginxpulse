@@ -1,6 +1,9 @@
 package version
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestCompareVersions(t *testing.T) {
 	t.Parallel()
@@ -43,5 +46,36 @@ func TestIsStableVersion(t *testing.T) {
 	}
 	if isStableVersion("dev") {
 		t.Fatal("expected dev version to be excluded from stable update checks")
+	}
+}
+
+func TestGetLatestVersionCacheTTL(t *testing.T) {
+	t.Parallel()
+
+	previousVersion := Version
+	Version = "v1.6.18"
+	t.Cleanup(func() {
+		Version = previousVersion
+	})
+
+	tests := []struct {
+		name          string
+		latestVersion string
+		want          time.Duration
+	}{
+		{name: "failure cache", latestVersion: "", want: githubUpdateFailureTTL},
+		{name: "up to date cache is short", latestVersion: Version, want: githubNoUpdateCacheTTL},
+		{name: "older cached version is short", latestVersion: "v1.6.17", want: githubNoUpdateCacheTTL},
+		{name: "new update cache is long", latestVersion: "v9.9.9", want: githubUpdateCacheTTL},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := getLatestVersionCacheTTL(tt.latestVersion); got != tt.want {
+				t.Fatalf("getLatestVersionCacheTTL(%q) = %s, want %s", tt.latestVersion, got, tt.want)
+			}
+		})
 	}
 }
