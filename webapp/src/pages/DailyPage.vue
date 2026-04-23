@@ -2905,16 +2905,71 @@ function buildDayTimeRange(dateStr: string) {
   color: #86efac;
 }
 
+:global(body.dark-mode) .daily-dev-digest {
+  border-color: rgba(148, 163, 184, 0.18);
+  color: rgba(241, 245, 249, 0.94);
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.26);
+}
+
 :global(body.dark-mode) .daily-dev-digest.critical {
-  background: linear-gradient(180deg, rgba(69, 10, 10, 0.5), rgba(15, 23, 42, 0.78));
+  border-color: rgba(239, 68, 68, 0.3);
+  background: linear-gradient(180deg, rgba(69, 10, 10, 0.82), rgba(15, 23, 42, 0.92));
 }
 
 :global(body.dark-mode) .daily-dev-digest.watch {
-  background: linear-gradient(180deg, rgba(120, 53, 15, 0.45), rgba(15, 23, 42, 0.78));
+  border-color: rgba(245, 158, 11, 0.28);
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.78), rgba(15, 23, 42, 0.92));
 }
 
 :global(body.dark-mode) .daily-dev-digest.stable {
-  background: linear-gradient(180deg, rgba(20, 83, 45, 0.45), rgba(15, 23, 42, 0.78));
+  border-color: rgba(34, 197, 94, 0.24);
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.76), rgba(15, 23, 42, 0.92));
+}
+
+:global(body.dark-mode) .daily-dev-digest-title {
+  color: rgba(248, 250, 252, 0.96);
+}
+
+:global(body.dark-mode) .daily-dev-digest-line {
+  color: rgba(226, 232, 240, 0.94);
+}
+
+:global(body.dark-mode) .daily-dev-digest-line::before {
+  background: rgba(147, 197, 253, 0.86);
+}
+
+:global(body.dark-mode) .daily-dev-digest-line:hover {
+  color: #93c5fd;
+}
+
+:global(body.dark-mode) .daily-dev-digest-badge.critical {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.72);
+}
+
+:global(body.dark-mode) .daily-dev-digest-badge.watch {
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.72);
+}
+
+:global(body.dark-mode) .daily-dev-digest-badge.stable {
+  color: #bbf7d0;
+  background: rgba(20, 83, 45, 0.68);
+}
+
+:global(body.dark-mode) .daily-dev-subtitle,
+:global(body.dark-mode) .daily-dev-pill-label,
+:global(body.dark-mode) .daily-dev-block-sub,
+:global(body.dark-mode) .daily-dev-url-meta,
+:global(body.dark-mode) .daily-dev-cell-hint,
+:global(body.dark-mode) .daily-dev-cell-cta {
+  color: rgba(148, 163, 184, 0.92);
+}
+
+:global(body.dark-mode) .daily-dev-pill {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.54);
+  color: rgba(241, 245, 249, 0.94);
 }
 
 :global(body.dark-mode) .daily-empty-state {
