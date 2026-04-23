@@ -162,6 +162,7 @@ ensure_container_buildx_builder() {
   local requested_platforms="${1:-linux/amd64,linux/arm64}"
   local builder_name="${2:-nginxpulse-container-builder}"
   local driver
+  local current_name
   local candidate
 
   if ! buildx_available; then
@@ -169,16 +170,25 @@ ensure_container_buildx_builder() {
     return 1
   fi
 
+  driver="$(current_buildx_driver || true)"
+  current_name="$(docker buildx inspect 2>/dev/null | awk -F': +' '/^Name:/ {print $2; exit}')"
+  if [[ -n "$current_name" && ( "$driver" == "docker" || "$driver" == "docker-container" ) ]] && builder_supports_platforms "$current_name" "$requested_platforms"; then
+    docker buildx inspect --bootstrap >/dev/null
+    printf '%s\n' "$current_name"
+    return 0
+  fi
+
   for candidate in desktop-linux default; do
     if builder_exists "$candidate" && [[ "$(builder_driver "$candidate")" == "docker" ]] && builder_supports_platforms "$candidate" "$requested_platforms"; then
-      docker buildx use "$candidate" >/dev/null
+      if ! docker buildx use "$candidate" >/dev/null 2>&1; then
+        continue
+      fi
       docker buildx inspect --bootstrap >/dev/null
       printf '%s\n' "$candidate"
       return 0
     fi
   done
 
-  driver="$(current_buildx_driver || true)"
   if [[ "$driver" == "docker" ]]; then
     docker buildx inspect --bootstrap >/dev/null
     docker buildx inspect --bootstrap | awk -F': +' '/^Name:/ {print $2; exit}'
