@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	defaultNginxLogRegex        = `^(?P<ip>\S+) - (?P<user>\S+) \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<url>[^"]+) HTTP/\d\.\d" (?P<status>\d+) (?P<bytes>\d+) "(?P<referer>[^"]*)" "(?P<ua>[^"]*)"`
+	defaultNginxLogRegex        = `^(?P<ip>\S+) - (?P<user>\S+) \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<url>[^"]+) HTTP/\d(?:\.\d+)?" (?P<status>\d+) (?P<bytes>\d+|-) "(?P<referer>[^"]*)" "(?P<ua>[^"]*)"(?: (?P<trace_first>\S+) (?P<trace_second>\S+)(?: (?P<upstream_response_time>[^ ]+(?:,\s*[^ ]+)*))?(?: (?P<upstream_addr>\S+))?(?: (?P<host>\S+))?(?: (?P<request_id>\S+))?)?(?: .*)?$`
 	defaultApacheLogRegex       = `^(?P<ip>\S+) (?P<ident>\S+) (?P<user>\S+) \[(?P<time>[^\]]+)\] "(?P<request>[^"]*)" (?P<status>\d{3}) (?P<bytes>\d+|-) "(?P<referer>[^"]*)" "(?P<ua>[^"]*)"`
 	defaultTraefikLogRegex      = `^(?P<ip>\S+) (?P<ident>\S+) (?P<user>\S+) \[(?P<time>[^\]]+)\] "(?P<request>[^"]*)" (?P<status>\d{3}) (?P<bytes>\d+|-) "(?P<referer>[^"]*)" "(?P<ua>[^"]*)" (?P<req_count>\d+) "(?P<router>[^"]*)" "(?P<server_url>[^"]*)" (?P<duration_ms>[0-9.]+)ms`
 	defaultEnvoyLogRegex        = `^\[(?P<time>[^\]]+)\] "(?P<request>[^"]*)" (?P<status>\d{3}) (?P<response_flags>\S+) (?P<bytes_received>\d+) (?P<bytes>\d+) (?P<duration>\d+) (?P<upstream_time>\S+) "(?P<ip>[^"]*)" "(?P<ua>[^"]*)" "(?P<request_id>[^"]*)" "(?P<authority>[^"]*)" "(?P<upstream_host>[^"]*)"`

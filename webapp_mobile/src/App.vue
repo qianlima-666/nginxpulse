@@ -19,9 +19,15 @@
         <span v-else class="nav-title-text">{{ pageTitle }}</span>
       </template>
       <template #left>
-        <div class="mobile-brand">
+        <a
+          class="mobile-brand"
+          href="https://github.com/likaia/nginxpulse/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open NginxPulse GitHub repository"
+        >
           <img :src="brandMarkSrc" alt="NginxPulse" class="brand-logo" />
-        </div>
+        </a>
       </template>
       <template #right>
         <div class="nav-actions">
@@ -903,6 +909,24 @@ function onSelectLanguage(action: { value?: string }) {
   gap: 0;
   font-weight: 700;
   color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.mobile-brand:hover,
+.mobile-brand:focus-visible {
+  opacity: 0.9;
+}
+
+.mobile-brand:active {
+  transform: scale(0.96);
+}
+
+.mobile-brand:focus-visible {
+  outline: 2px solid rgba(29, 107, 255, 0.35);
+  outline-offset: 3px;
 }
 
 .brand-logo {

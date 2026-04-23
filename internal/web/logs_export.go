@@ -152,7 +152,11 @@ func exportLogsXLSXWithProgress(
 			onProgress(processed, total)
 		}
 
-		if logsResult.Pagination.Pages > 0 && page >= logsResult.Pagination.Pages {
+		if logsResult.Pagination.Exact {
+			if logsResult.Pagination.Pages > 0 && page >= logsResult.Pagination.Pages {
+				break
+			}
+		} else if !logsResult.Pagination.HasMore {
 			break
 		}
 	}

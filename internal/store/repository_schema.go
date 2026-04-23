@@ -453,6 +453,7 @@ func createLogTable(execer sqlExecer, tableName string) error {
             upstream_addr TEXT NOT NULL DEFAULT '',
             host TEXT NOT NULL DEFAULT '',
             request_id TEXT NOT NULL DEFAULT '',
+            fingerprint TEXT,
             referer_id BIGINT NOT NULL,
             ua_id BIGINT NOT NULL,
             location_id BIGINT NOT NULL,
@@ -483,6 +484,7 @@ func (r *Repository) ensureLogTraceColumns(tableName string) error {
 		{name: "upstream_addr", definition: `TEXT NOT NULL DEFAULT ''`},
 		{name: "host", definition: `TEXT NOT NULL DEFAULT ''`},
 		{name: "request_id", definition: `TEXT NOT NULL DEFAULT ''`},
+		{name: "fingerprint", definition: `TEXT`},
 	}
 
 	for _, column := range columns {
@@ -516,6 +518,18 @@ func createLogIndexes(execer sqlExecer, websiteID string) error {
 		),
 		fmt.Sprintf(
 			`CREATE INDEX IF NOT EXISTS idx_%s_session_key ON "%s"(ip_id, ua_id, timestamp) WHERE pageview_flag = 1`,
+			websiteID, tableName,
+		),
+		fmt.Sprintf(
+			`CREATE INDEX IF NOT EXISTS idx_%s_ip_location ON "%s"(ip_id, location_id)`,
+			websiteID, tableName,
+		),
+		fmt.Sprintf(
+			`CREATE INDEX IF NOT EXISTS idx_%s_location_ip ON "%s"(location_id, ip_id)`,
+			websiteID, tableName,
+		),
+		fmt.Sprintf(
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_%s_log_fingerprint ON "%s"(timestamp, fingerprint)`,
 			websiteID, tableName,
 		),
 	}
@@ -605,6 +619,10 @@ func createSessionTables(execer sqlExecer, websiteID string) error {
 		),
 		fmt.Sprintf(
 			`CREATE INDEX IF NOT EXISTS idx_%s_sessions_start ON "%s_sessions"(start_ts)`,
+			websiteID, websiteID,
+		),
+		fmt.Sprintf(
+			`CREATE INDEX IF NOT EXISTS idx_%s_sessions_start_entry ON "%s_sessions"(start_ts, entry_url_id)`,
 			websiteID, websiteID,
 		),
 		fmt.Sprintf(

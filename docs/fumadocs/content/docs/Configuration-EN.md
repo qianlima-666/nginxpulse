@@ -279,6 +279,8 @@ Common fields:
 ```
 
 #### agent source
+Use this only for agent-pushed logs. The `id` must match the agent config `sourceID`; the source is used for parse overrides and is not periodically scanned by the NginxPulse server. For installation, deployment, and `/api/ingest/logs` push setup, see the Push Agent section in [Log Parsing](Log-Parsing-EN).
+
 ```json
 {
   "id": "agent-main",

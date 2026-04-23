@@ -145,7 +145,9 @@ func (p *LogParser) scanSingleFileForWindow(
 		defer closer.Close()
 	}
 
-	entriesCount, _, _, _ := p.parseLogLines(reader, websiteID, sourceID, parserResult, window)
+	sourceCtx := fileParseSourceContext(logPath, 0)
+	sourceCtx.sourceID = sourceID
+	entriesCount, _, _, _ := p.parseLogLines(reader, websiteID, sourceCtx, parserResult, window)
 	if entriesCount > 0 {
 		logrus.Infof("网站 %s 的日志文件 %s 按时间段重解析完成，解析了 %d 条记录", websiteID, logPath, entriesCount)
 	}
@@ -212,10 +214,12 @@ func (p *LogParser) scanTargetForWindow(
 		if err != nil {
 			return err
 		}
-		entriesCount, _, _, _ = p.parseLogLines(gzReader, websiteID, target.SourceID, parserResult, window)
+		sourceCtx := targetParseSourceContext(target.SourceID, target.Key, 0)
+		entriesCount, _, _, _ = p.parseLogLines(gzReader, websiteID, sourceCtx, parserResult, window)
 		gzReader.Close()
 	} else {
-		entriesCount, _, _, _ = p.parseLogLines(reader, websiteID, target.SourceID, parserResult, window)
+		sourceCtx := targetParseSourceContext(target.SourceID, target.Key, 0)
+		entriesCount, _, _, _ = p.parseLogLines(reader, websiteID, sourceCtx, parserResult, window)
 	}
 
 	if entriesCount > 0 {

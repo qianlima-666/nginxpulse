@@ -61,6 +61,7 @@ func (f *StatsFactory) registerDefaultManagers() {
 	// 注册各种统计管理器
 	f.managers["timeseries"] = NewTimeSeriesStatsManager(f.repo)
 	f.managers["overall"] = NewOverallStatsManager(f.repo)
+	f.managers["developer_daily"] = NewDeveloperDailyStatsManager(f.repo)
 
 	f.managers["url"] = NewURLStatsManager(f.repo)
 	f.managers["referer"] = NewrefererStatsManager(f.repo)
@@ -191,6 +192,7 @@ func (f *StatsFactory) BuildQueryFromRequest(
 	requiredParams := map[string]map[string]string{
 		"timeseries":       {"id": "string", "timeRange": "string", "viewType": "string"},
 		"overall":          {"id": "string", "timeRange": "string"},
+		"developer_daily":  {"id": "string", "timeRange": "string"},
 		"url":              {"id": "string", "timeRange": "string", "limit": "int"},
 		"referer":          {"id": "string", "timeRange": "string", "limit": "int"},
 		"referer_ip":       {"id": "string", "timeRange": "string", "limit": "int"},

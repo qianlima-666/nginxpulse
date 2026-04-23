@@ -20,6 +20,13 @@
           <van-icon name="arrow-down" />
         </button>
       </div>
+      <div class="filter-tag-row">
+        <div class="inline-tags">
+          <van-tag round plain type="primary">
+            {{ t('common.last7Days') }}
+          </van-tag>
+        </div>
+      </div>
     </section>
 
     <van-empty v-if="!currentWebsiteId && !websitesLoading" :description="t('common.emptyWebsite')" />
@@ -246,10 +253,11 @@ const loading = ref(false);
 const finished = ref(false);
 const page = ref(1);
 const pageSize = 20;
-const totalPages = ref(0);
 const logs = ref<Array<Record<string, any>>>([]);
 const detailVisible = ref(false);
 const detailItem = ref<Record<string, any> | null>(null);
+const timeStart = ref('');
+const timeEnd = ref('');
 
 const currentLocale = computed(() => normalizeLocale(locale.value));
 
@@ -315,6 +323,26 @@ const activeFilterTags = computed(() => {
 });
 
 const activeFilterCount = computed(() => activeFilterTags.value.length);
+
+function pad(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function formatDateTimeValue(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
+}
+
+function applyDefaultRecentRange() {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - 6);
+  timeStart.value = formatDateTimeValue(startOfDay(start));
+  timeEnd.value = formatDateTimeValue(now);
+}
 
 async function loadWebsites() {
   websitesLoading.value = true;
@@ -442,8 +470,8 @@ async function loadMore() {
       statusCodeParam.value || undefined,
       excludeInternal.value,
       undefined,
-      undefined,
-      undefined,
+      timeStart.value || undefined,
+      timeEnd.value || undefined,
       undefined,
       undefined,
       pageviewOnly.value,
@@ -455,8 +483,10 @@ async function loadMore() {
     const rawLogs = result.logs || [];
     const mapped = rawLogs.map((log: Record<string, any>, index: number) => mapLogItem(log, index));
     logs.value = logs.value.concat(mapped);
-    totalPages.value = result.pagination?.pages || 0;
-    if (page.value >= totalPages.value || rawLogs.length === 0) {
+    const exact = result.pagination?.exact !== false;
+    const pages = result.pagination?.pages || 0;
+    const hasMore = exact ? page.value < pages : Boolean(result.pagination?.hasMore);
+    if (!hasMore || rawLogs.length === 0) {
       finished.value = true;
     } else {
       page.value += 1;
@@ -470,6 +500,7 @@ async function loadMore() {
 }
 
 function resetAndLoad() {
+  applyDefaultRecentRange();
   logs.value = [];
   page.value = 1;
   finished.value = false;
@@ -513,6 +544,7 @@ watch(statusCodeInput, (value) => {
 });
 
 onMounted(() => {
+  applyDefaultRecentRange();
   loadWebsites();
 });
 </script>

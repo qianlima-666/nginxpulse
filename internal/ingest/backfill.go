@@ -150,6 +150,8 @@ func (p *LogParser) backfillPlainFile(
 		cutoffTs = time.Now().AddDate(0, 0, -recentLogWindowDays).Unix()
 	}
 	window := parseWindow{maxTs: cutoffTs}
+	sourceCtx := fileParseSourceContext(filePath, state.BackfillOffset)
+	domainMatcher := newWebsiteDomainMatcher(websiteID)
 
 	batch := make([]store.NginxLogRecord, 0, p.parseBatchSize)
 	processBatch := func() {
@@ -188,6 +190,7 @@ func (p *LogParser) backfillPlainFile(
 			p.updateParsedRange(state, minTs, maxTs)
 			return bytesRead, entryCount, err
 		}
+		lineOffset := state.BackfillOffset + bytesRead
 		bytesRead += int64(len(line))
 		budget.consume(int64(len(line)))
 
@@ -206,6 +209,13 @@ func (p *LogParser) backfillPlainFile(
 			}
 			continue
 		}
+		if !domainMatcher.includesHost(entry.Host) {
+			if err != nil {
+				continue
+			}
+			continue
+		}
+		entry.Fingerprint = buildLogLineFingerprint(sourceCtx, lineOffset, line)
 		ts := entry.Timestamp.Unix()
 		if !window.allows(ts) {
 			if err != nil {
@@ -279,7 +289,8 @@ func (p *LogParser) backfillGzipFile(
 	window := parseWindow{maxTs: cutoffTs}
 
 	parserResult := EmptyParserResult("", "")
-	entriesCount, bytesRead, minTs, maxTs := p.parseLogLines(gzReader, websiteID, "", &parserResult, window)
+	sourceCtx := fileParseSourceContext(filePath, 0)
+	entriesCount, bytesRead, minTs, maxTs := p.parseLogLines(gzReader, websiteID, sourceCtx, &parserResult, window)
 	budget.consume(bytesRead)
 	state.BackfillDone = true
 	p.updateParsedRange(state, minTs, maxTs)

@@ -149,10 +149,12 @@ func (p *LogParser) scanTarget(
 		if err != nil {
 			return err
 		}
-		entriesCount, bytesRead, minTs, maxTs = p.parseLogLines(gzReader, websiteID, target.SourceID, parserResult, window)
+		sourceCtx := targetParseSourceContext(target.SourceID, target.Key, 0)
+		entriesCount, bytesRead, minTs, maxTs = p.parseLogLines(gzReader, websiteID, sourceCtx, parserResult, window)
 		gzReader.Close()
 	} else {
-		entriesCount, bytesRead, minTs, maxTs = p.parseLogLines(reader, websiteID, target.SourceID, parserResult, window)
+		sourceCtx := targetParseSourceContext(target.SourceID, target.Key, startOffset)
+		entriesCount, bytesRead, minTs, maxTs = p.parseLogLines(reader, websiteID, sourceCtx, parserResult, window)
 	}
 
 	updateTargetParsedRange(&state, minTs, maxTs)

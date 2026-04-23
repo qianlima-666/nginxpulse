@@ -65,6 +65,7 @@ func serveStaticFromFS(assets fs.FS, fileServer http.Handler, requestPath string
 	}
 
 	if _, err := fs.Stat(assets, cleanPath); err == nil {
+		setStaticCacheHeaders(cleanPath, c)
 		c.Request.URL.Path = "/" + cleanPath
 		fileServer.ServeHTTP(c.Writer, c.Request)
 		return
@@ -88,6 +89,7 @@ func serveIndex(assets fs.FS, c *gin.Context) {
 	}
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.Header("Cache-Control", "no-cache")
 	if c.Request.Method == http.MethodHead {
 		c.Status(http.StatusOK)
 		return
@@ -97,5 +99,19 @@ func serveIndex(assets fs.FS, c *gin.Context) {
 		_, _ = io.Copy(c.Writer, file)
 	} else {
 		c.Status(http.StatusNotFound)
+	}
+}
+
+func setStaticCacheHeaders(cleanPath string, c *gin.Context) {
+	baseName := path.Base(cleanPath)
+	if strings.HasPrefix(cleanPath, "assets/") {
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		return
+	}
+	switch baseName {
+	case "favicon.svg", "brand-mark.svg":
+		c.Header("Cache-Control", "public, max-age=86400")
+	case "manifest.webmanifest":
+		c.Header("Cache-Control", "no-cache")
 	}
 }

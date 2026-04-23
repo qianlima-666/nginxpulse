@@ -172,7 +172,156 @@
         <div class="daily-trend-sub">{{ trendSummary }}</div>
       </div>
       <div class="daily-trend-chart">
-        <canvas ref="ipChartRef"></canvas>
+        <canvas v-show="hasTrafficTrendData" ref="ipChartRef"></canvas>
+        <div v-if="!hasTrafficTrendData" class="daily-empty-state">
+          <span class="daily-empty-state-icon"><i class="ri-line-chart-line"></i></span>
+          <div class="daily-empty-state-title">{{ t('daily.trendEmptyTitle') }}</div>
+          <div class="daily-empty-state-text">{{ t('daily.trendEmptyText') }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card daily-dev-section">
+    <div class="daily-section-header daily-dev-header">
+      <div class="daily-section-title">
+        <span class="section-icon danger"><i class="ri-pulse-line"></i></span>
+        {{ t('daily.devSectionTitle') }}
+      </div>
+      <div class="daily-dev-pill-row">
+        <span v-for="pill in developerSummaryPills" :key="pill.label" class="daily-dev-pill">
+          <span class="daily-dev-pill-label">{{ pill.label }}</span>
+          <strong>{{ pill.value }}</strong>
+        </span>
+      </div>
+    </div>
+    <div class="daily-dev-subtitle">{{ t('daily.devSectionSubtitle') }}</div>
+    <button
+      v-if="developerDigest.compact"
+      type="button"
+      class="daily-dev-status-strip"
+      :class="developerDigest.tone"
+      @click="goToLogsByDigest(developerDigest.summaryQuery)"
+    >
+      <span class="daily-dev-status-dot" :class="developerDigest.tone" aria-hidden="true"></span>
+      <div class="daily-dev-status-copy">
+        <div class="daily-dev-status-title">{{ developerDigest.title }}</div>
+        <div class="daily-dev-status-text">{{ developerDigest.summary }}</div>
+      </div>
+      <span class="daily-dev-status-meta" :class="developerDigest.tone">{{ developerDigest.label }}</span>
+    </button>
+    <div v-else class="daily-dev-digest" :class="developerDigest.tone">
+      <div class="daily-dev-digest-head">
+        <div class="daily-dev-digest-title">{{ developerDigest.title }}</div>
+        <span class="daily-dev-digest-badge" :class="developerDigest.tone">{{ developerDigest.label }}</span>
+      </div>
+      <div class="daily-dev-digest-lines">
+        <button
+          v-for="line in developerDigest.lines"
+          :key="line.text"
+          type="button"
+          class="daily-dev-digest-line"
+          @click="goToLogsByDigest(line.query)"
+        >
+          {{ line.text }}
+        </button>
+      </div>
+    </div>
+
+    <div class="daily-dev-card-grid">
+      <div v-for="card in developerCards" :key="card.key" class="daily-dev-card">
+        <div class="daily-dev-card-header">
+          <div>
+            <div class="daily-dev-card-title">{{ card.title }}</div>
+            <div class="daily-dev-card-subtitle">{{ card.subtitle }}</div>
+          </div>
+          <span class="daily-dev-card-icon" :class="card.iconClass">
+            <i :class="card.icon"></i>
+          </span>
+        </div>
+        <div class="daily-dev-card-value">{{ card.valueText }}</div>
+        <div class="daily-dev-card-meta">
+          <span>{{ t('common.comparePrev') }}</span>
+          <span :class="card.deltaClass">{{ card.deltaText }}</span>
+        </div>
+        <div class="daily-dev-card-detail">{{ card.detailText }}</div>
+      </div>
+    </div>
+
+    <div class="daily-dev-grid">
+      <div class="daily-dev-chart-card">
+        <div class="daily-dev-block-header">
+          <div class="daily-dev-block-title">{{ t('daily.devTrendTitle') }}</div>
+          <div class="daily-dev-block-sub">{{ t('daily.devTrendSubtitle') }}</div>
+        </div>
+        <div class="daily-dev-chart">
+          <canvas v-show="hasDeveloperTrendData" ref="developerTrendChartRef"></canvas>
+          <div v-if="!hasDeveloperTrendData" class="daily-empty-state">
+            <span class="daily-empty-state-icon"><i class="ri-pulse-line"></i></span>
+            <div class="daily-empty-state-title">{{ t('daily.devTrendEmptyTitle') }}</div>
+            <div class="daily-empty-state-text">{{ t('daily.devTrendEmptyText') }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="daily-dev-table-card">
+        <div class="daily-dev-block-header">
+          <div class="daily-dev-block-title">{{ t('daily.devIssueTitle') }}</div>
+          <div class="daily-dev-block-sub">{{ t('daily.devIssueSubtitle') }}</div>
+        </div>
+        <div class="table-wrapper">
+          <table class="ranking-table">
+            <thead>
+              <tr>
+                <th>{{ t('logs.request') }}</th>
+                <th>{{ t('daily.devIssue5xx') }}</th>
+                <th>{{ t('logs.duration') }}</th>
+                <th>{{ t('daily.devSlowCount') }}</th>
+                <th>{{ t('common.comparePrev') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!developerIssueRows.length">
+                <td colspan="5">{{ t('daily.devIssueEmpty') }}</td>
+              </tr>
+              <tr v-else v-for="row in developerIssueRows" :key="row.url" class="daily-dev-issue-row">
+                <td class="daily-dev-url-cell">
+                  <button type="button" class="daily-dev-cell-link daily-dev-url-button" @click="goToLogsByIssue(row.url, 'all')">
+                    <div class="daily-dev-url" :title="row.url">{{ row.url }}</div>
+                    <div class="daily-dev-url-meta">{{ t('daily.devIssueRequestCount', { value: row.requestsText }) }}</div>
+                    <div class="daily-dev-cell-cta">{{ t('daily.devViewLogs') }}</div>
+                  </button>
+                </td>
+                <td>
+                  <button type="button" class="daily-dev-cell-link" @click="goToLogsByIssue(row.url, '5xx')">
+                    <div>{{ row.errors5xxText }}</div>
+                    <div class="daily-dev-cell-cta">{{ t('daily.devView5xx') }}</div>
+                  </button>
+                </td>
+                <td>
+                  <button type="button" class="daily-dev-cell-link" @click="goToLogsByIssue(row.url, 'latency')">
+                    <div>{{ row.avgRequestTimeText }}</div>
+                    <div class="daily-dev-cell-hint">{{ t('daily.devMaxDuration', { value: row.maxRequestTimeText }) }}</div>
+                    <div class="daily-dev-cell-cta">{{ t('daily.devViewLatency') }}</div>
+                  </button>
+                </td>
+                <td>
+                  <button type="button" class="daily-dev-cell-link" @click="goToLogsByIssue(row.url, 'slow')">
+                    <div>{{ row.slowRequestsText }}</div>
+                    <div class="daily-dev-cell-cta">{{ t('daily.devViewSlow') }}</div>
+                  </button>
+                </td>
+                <td>
+                  <button type="button" class="daily-dev-cell-link" :class="row.compareClass" @click="goToLogsByIssue(row.url, 'compare')">
+                    <div>{{ row.compareText }}</div>
+                    <div class="daily-dev-cell-cta">{{ t('daily.devViewCompare') }}</div>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="daily-summary-strip">{{ developerIssueSummary }}</div>
       </div>
     </div>
   </section>
@@ -187,7 +336,12 @@
     <div class="daily-section-body daily-source-grid">
       <div class="daily-donut-card">
         <div class="daily-donut">
-          <canvas ref="sourceChartRef"></canvas>
+          <canvas v-show="hasSourceDistributionData" ref="sourceChartRef"></canvas>
+          <div v-if="!hasSourceDistributionData" class="daily-empty-state">
+            <span class="daily-empty-state-icon"><i class="ri-share-forward-line"></i></span>
+            <div class="daily-empty-state-title">{{ t('daily.sourceEmptyTitle') }}</div>
+            <div class="daily-empty-state-text">{{ t('daily.sourceEmptyText') }}</div>
+          </div>
         </div>
         <div class="daily-summary-cards">
           <div class="daily-summary-card search">
@@ -359,7 +513,12 @@
     </div>
       <div class="daily-visitor-grid">
         <div class="daily-donut">
-          <canvas ref="visitorChartRef"></canvas>
+          <canvas v-show="hasVisitorDistributionData" ref="visitorChartRef"></canvas>
+          <div v-if="!hasVisitorDistributionData" class="daily-empty-state">
+            <span class="daily-empty-state-icon"><i class="ri-user-search-line"></i></span>
+            <div class="daily-empty-state-title">{{ t('daily.visitorEmptyTitle') }}</div>
+            <div class="daily-empty-state-text">{{ t('daily.visitorEmptyText') }}</div>
+          </div>
         </div>
         <div class="daily-visitor-table">
           <table class="ranking-table">
@@ -400,7 +559,12 @@
     <div class="daily-device-grid">
       <div class="daily-device-left">
         <div class="daily-donut">
-          <canvas ref="deviceChartRef"></canvas>
+          <canvas v-show="hasDeviceDistributionData" ref="deviceChartRef"></canvas>
+          <div v-if="!hasDeviceDistributionData" class="daily-empty-state">
+            <span class="daily-empty-state-icon"><i class="ri-smartphone-line"></i></span>
+            <div class="daily-empty-state-title">{{ t('daily.deviceEmptyTitle') }}</div>
+            <div class="daily-empty-state-text">{{ t('daily.deviceEmptyText') }}</div>
+          </div>
         </div>
         <div class="daily-device-cards">
           <div class="daily-device-card">
@@ -479,6 +643,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import {
+  fetchDeveloperDailyStats,
   fetchBrowserStats,
   fetchDeviceStats,
   fetchLocationStats,
@@ -491,7 +656,15 @@ import {
   fetchUrlStats,
   fetchWebsites,
 } from '@/api';
-import type { RefererIPBatchStats, RefererIPGroupStats, SimpleSeriesStats, TimeSeriesStats, WebsiteInfo } from '@/api/types';
+import type {
+  DeveloperDailyStats,
+  DeveloperMetric,
+  RefererIPBatchStats,
+  RefererIPGroupStats,
+  SimpleSeriesStats,
+  TimeSeriesStats,
+  WebsiteInfo,
+} from '@/api/types';
 import {
   formatBrowserLabel,
   formatDeviceLabel,
@@ -501,7 +674,7 @@ import {
   normalizeDeviceCategory,
 } from '@/i18n/mappings';
 import { normalizeLocale } from '@/i18n';
-import { formatDate, getUserPreference, saveUserPreference } from '@/utils';
+import { formatDate, formatTraffic, getUserPreference, saveUserPreference } from '@/utils';
 import { Chart } from '@/utils/chartjs';
 import ParsingOverlay from '@/components/ParsingOverlay.vue';
 import HeaderToolbar from '@/components/HeaderToolbar.vue';
@@ -522,6 +695,7 @@ const canGoNextDay = computed(() => currentDate.value < formatDate(maxDate));
 const overall = ref<Record<string, any> | null>(null);
 const sessionSummary = ref<Record<string, any> | null>(null);
 const sessionSummaryPrev = ref<Record<string, any> | null>(null);
+const developerDaily = ref<DeveloperDailyStats | null>(null);
 const timeSeries = ref<TimeSeriesStats | null>(null);
 const refererStats = ref<SimpleSeriesStats | null>(null);
 const refererPrev = ref<SimpleSeriesStats | null>(null);
@@ -545,11 +719,13 @@ const sourceTab = ref<'referer' | 'search' | 'ip'>('referer');
 const sourceIPTab = ref<SourceIPKind>('all');
 
 const ipChartRef = ref<HTMLCanvasElement | null>(null);
+const developerTrendChartRef = ref<HTMLCanvasElement | null>(null);
 const sourceChartRef = ref<HTMLCanvasElement | null>(null);
 const visitorChartRef = ref<HTMLCanvasElement | null>(null);
 const deviceChartRef = ref<HTMLCanvasElement | null>(null);
 
 let ipChart: Chart | null = null;
+let developerTrendChart: Chart | null = null;
 let sourceChart: Chart | null = null;
 let visitorChart: Chart | null = null;
 let deviceChart: Chart | null = null;
@@ -567,6 +743,214 @@ const trendSummary = computed(() => {
   const maxIndex = data.indexOf(Math.max(...data));
   const minIndex = data.indexOf(Math.min(...data));
   return t('daily.trendSummary', { max: maxIndex, min: minIndex });
+});
+
+const developerSummary = computed(() => developerDaily.value?.summary || emptyDeveloperSummary());
+
+const developerSummaryPills = computed(() => {
+  const summary = developerSummary.value;
+  return [
+    {
+      label: t('daily.devTotalRequests'),
+      value: formatNumber(summary.totalRequests),
+    },
+    {
+      label: t('daily.devAvgRequestSize'),
+      value: formatMetricValue(summary.avgRequestSizeBytes, 'traffic'),
+    },
+  ];
+});
+
+const developerDigest = computed(() => {
+  const summary = developerSummary.value;
+  const lines: Array<{ text: string; query: Record<string, string> }> = [];
+  let severityScore = 0;
+  const stableQuery = buildDigestLogsQuery({
+    sortField: 'timestamp',
+    sortOrder: 'desc',
+  });
+
+  const status5xxShare = summary.status5xx.shareCurrent ?? 0;
+  const status5xxDelta = summary.status5xx.delta || 0;
+  if (summary.status5xx.current > 0 || status5xxDelta > 0) {
+    lines.push({
+      text: t('daily.devDigest5xx', {
+        count: formatMetricValue(summary.status5xx, 'count'),
+        share: formatMetricShare(summary.status5xx),
+        delta: formatMetricDelta(summary.status5xx, 'count'),
+      }),
+      query: buildDigestLogsQuery({
+        statusClass: '5xx',
+        sortField: 'status_code',
+        sortOrder: 'desc',
+      }),
+    });
+    severityScore += status5xxShare >= 0.03 || status5xxDelta >= 10 ? 2 : 1;
+  }
+
+  const latencyDelta = summary.avgRequestTimeMs.delta || 0;
+  if (summary.avgRequestTimeMs.current > 0 && latencyDelta > 0) {
+    lines.push({
+      text: t('daily.devDigestLatency', {
+        current: formatMetricValue(summary.avgRequestTimeMs, 'ms'),
+        delta: formatMetricDelta(summary.avgRequestTimeMs, 'ms'),
+      }),
+      query: buildDigestLogsQuery({
+        sortField: 'request_time_ms',
+        sortOrder: 'desc',
+      }),
+    });
+    severityScore += latencyDelta >= 200 ? 2 : 1;
+  }
+
+  const upstreamDelta = summary.avgUpstreamTimeMs.delta || 0;
+  if (summary.avgUpstreamTimeMs.current > 0 && upstreamDelta > 0) {
+    lines.push({
+      text: t('daily.devDigestUpstream', {
+        current: formatMetricValue(summary.avgUpstreamTimeMs, 'ms'),
+        delta: formatMetricDelta(summary.avgUpstreamTimeMs, 'ms'),
+      }),
+      query: buildDigestLogsQuery({
+        sortField: 'upstream_response_time_ms',
+        sortOrder: 'desc',
+      }),
+    });
+    severityScore += upstreamDelta >= 150 ? 2 : 1;
+  }
+
+  const topIssue = developerIssueRows.value[0];
+  if (topIssue) {
+    lines.push({
+      text: t('daily.devDigestIssue', {
+        url: topIssue.url,
+        errors: topIssue.errors5xxText,
+        duration: topIssue.avgRequestTimeText,
+      }),
+      query: buildDigestLogsQuery({
+        filter: topIssue.url,
+        sortField: 'request_time_ms',
+        sortOrder: 'desc',
+      }),
+    });
+    severityScore += topIssue.errors5xx > 0 ? 2 : 1;
+  }
+
+  if (!lines.length) {
+    return {
+      compact: true,
+      tone: 'stable',
+      title: t('daily.devStatusTitle'),
+      label: t('daily.devDigestStableLabel'),
+      summary: t('daily.devDigestStableLine'),
+      summaryQuery: stableQuery,
+      lines: [],
+    };
+  }
+
+  const tone = severityScore >= 4 ? 'critical' : 'watch';
+  return {
+    compact: false,
+    tone,
+    title: t('daily.devDigestTitle'),
+    label: tone === 'critical' ? t('daily.devDigestCriticalLabel') : t('daily.devDigestWatchLabel'),
+    summary: '',
+    summaryQuery: stableQuery,
+    lines,
+  };
+});
+
+const developerCards = computed(() => {
+  const summary = developerSummary.value;
+  const threshold = developerDaily.value?.slowThresholdMs || 0;
+  return [
+    {
+      key: 'status5xx',
+      title: t('daily.dev5xxTitle'),
+      subtitle: t('daily.dev5xxSubtitle'),
+      icon: 'ri-alarm-warning-line',
+      iconClass: 'critical',
+      valueText: formatMetricValue(summary.status5xx, 'count'),
+      deltaText: formatMetricDelta(summary.status5xx, 'count'),
+      deltaClass: deltaClass(summary.status5xx.delta || 0),
+      detailText: t('daily.devRateDetail', { value: formatMetricShare(summary.status5xx) }),
+    },
+    {
+      key: 'status4xx',
+      title: t('daily.dev4xxTitle'),
+      subtitle: t('daily.dev4xxSubtitle'),
+      icon: 'ri-error-warning-line',
+      iconClass: 'warning',
+      valueText: formatMetricValue(summary.status4xx, 'count'),
+      deltaText: formatMetricDelta(summary.status4xx, 'count'),
+      deltaClass: deltaClass(summary.status4xx.delta || 0),
+      detailText: t('daily.devRateDetail', { value: formatMetricShare(summary.status4xx) }),
+    },
+    {
+      key: 'avgRequestTimeMs',
+      title: t('daily.devLatencyTitle'),
+      subtitle: t('daily.devLatencySubtitle'),
+      icon: 'ri-timer-flash-line',
+      iconClass: 'latency',
+      valueText: formatMetricValue(summary.avgRequestTimeMs, 'ms'),
+      deltaText: formatMetricDelta(summary.avgRequestTimeMs, 'ms'),
+      deltaClass: deltaClass(summary.avgRequestTimeMs.delta || 0),
+      detailText: t('daily.devRateDetail', { value: formatMetricRate(summary.avgRequestTimeMs) }),
+    },
+    {
+      key: 'avgUpstreamTimeMs',
+      title: t('daily.devUpstreamTitle'),
+      subtitle: t('daily.devUpstreamSubtitle'),
+      icon: 'ri-exchange-funds-line',
+      iconClass: 'upstream',
+      valueText: formatMetricValue(summary.avgUpstreamTimeMs, 'ms'),
+      deltaText: formatMetricDelta(summary.avgUpstreamTimeMs, 'ms'),
+      deltaClass: deltaClass(summary.avgUpstreamTimeMs.delta || 0),
+      detailText: t('daily.devRateDetail', { value: formatMetricRate(summary.avgUpstreamTimeMs) }),
+    },
+    {
+      key: 'slowRequestRate',
+      title: t('daily.devSlowTitle'),
+      subtitle: t('daily.devSlowSubtitle', { value: formatMs(threshold) }),
+      icon: 'ri-speed-up-line',
+      iconClass: 'slow',
+      valueText: formatMetricValue(summary.slowRequestRate, 'percent'),
+      deltaText: formatMetricDelta(summary.slowRequestRate, 'percent-point'),
+      deltaClass: deltaClass(summary.slowRequestRate.delta || 0),
+      detailText: t('daily.devSlowDetail', {
+        count: formatMetricValue(summary.slowRequests, 'count'),
+        threshold: formatMs(threshold),
+      }),
+    },
+  ];
+});
+
+const developerIssueRows = computed(() =>
+  (developerDaily.value?.topIssues || []).map((item) => ({
+    ...item,
+    requestsText: formatNumber(item.requests),
+    errors5xxText: formatNumber(item.errors5xx),
+    avgRequestTimeText: formatMs(item.avgRequestTimeMs),
+    slowRequestsText: formatNumber(item.slowRequests),
+    compareText: t('daily.devIssueCompare', {
+      errors: formatSigned(item.errors5xxDelta),
+      duration: formatSignedMs(item.avgRequestTimeDeltaMs),
+    }),
+    compareClass: deltaClass(Math.max(item.errors5xxDelta, item.avgRequestTimeDeltaMs)),
+    maxRequestTimeText: formatMs(item.maxRequestTimeMs),
+  }))
+);
+
+const developerIssueSummary = computed(() => {
+  const first = developerIssueRows.value[0];
+  if (!first) {
+    return t('daily.devIssueEmpty');
+  }
+  return t('daily.devIssueSummary', {
+    url: first.url,
+    errors: first.errors5xxText,
+    duration: first.avgRequestTimeText,
+    slow: first.slowRequestsText,
+  });
 });
 
 const kpiMetrics = computed(() => {
@@ -637,6 +1021,32 @@ const sourceIPSummary = computed(() => buildSourceIPSummary(sourceIPRows.value, 
 const sourceSummaryText = computed(() => (sourceTab.value === 'ip' ? sourceIPSummary.value : sourceSummary.value));
 const contentRows = computed(() => buildContentRows(urlStats.value, urlPrev.value));
 const visitorRows = computed(() => buildVisitorRows(overall.value, sessionSummary.value));
+const hasTrafficTrendData = computed(() => hasPositiveSeriesValues(timeSeries.value?.visitors));
+const hasDeveloperTrendData = computed(() => {
+  const trend = developerDaily.value?.trend;
+  if (!trend) {
+    return false;
+  }
+  return [
+    trend.status4xx,
+    trend.status5xx,
+    trend.avgRequestTimeMs,
+    trend.avgUpstreamTimeMs,
+  ].some((series) => hasPositiveSeriesValues(series));
+});
+const hasSourceDistributionData = computed(() => Object.values(sourceGroups.value).some((value) => value > 0));
+const hasVisitorDistributionData = computed(() => {
+  const current = overall.value || {};
+  return (current.newVisitorCount || 0) + (current.returningVisitorCount || 0) > 0;
+});
+const deviceDistribution = computed(() => ({
+  pc: getDeviceCount(deviceStats.value, 'desktop'),
+  ios: getOsCount(osStats.value, ['ios', 'iphone', 'ipad']),
+  android: getOsCount(osStats.value, ['android']),
+}));
+const hasDeviceDistributionData = computed(() =>
+  Object.values(deviceDistribution.value).some((value) => Number(value || 0) > 0)
+);
 const deviceCards = computed(() => buildDeviceCards(deviceStats.value, osStats.value));
 const browserRows = computed(() =>
   buildSimpleRows(browserStats.value, browserPrev.value, (label) => formatBrowserLabel(label, t))
@@ -677,6 +1087,10 @@ watch(timeSeries, (stats) => {
   if (stats) {
     renderTrend(stats);
   }
+});
+
+watch(developerDaily, (stats) => {
+  renderDeveloperTrend(stats?.trend || null);
 });
 
 watch(sourceGroups, (groups) => {
@@ -736,6 +1150,7 @@ async function loadWebsites() {
 
 async function loadDailyReport() {
   if (!currentWebsiteId.value || !currentDate.value) {
+    developerDaily.value = null;
     return;
   }
 
@@ -748,6 +1163,7 @@ async function loadDailyReport() {
       overallData,
       sessionData,
       sessionPrevData,
+      developerDailyData,
       timeSeriesData,
       refererData,
       refererPrevData,
@@ -767,6 +1183,7 @@ async function loadDailyReport() {
       fetchOverallStats(currentWebsiteId.value, dateStr),
       fetchSessionSummary(currentWebsiteId.value, dateStr),
       fetchSessionSummary(currentWebsiteId.value, prevDate),
+      fetchDeveloperDailyStats(currentWebsiteId.value, dateStr),
       fetchTimeSeriesStats(currentWebsiteId.value, prevDate, 'hourly'),
       fetchRefererStats(currentWebsiteId.value, dateStr, 10),
       fetchRefererStats(currentWebsiteId.value, prevDate, 10),
@@ -791,6 +1208,7 @@ async function loadDailyReport() {
     overall.value = overallData;
     sessionSummary.value = sessionData;
     sessionSummaryPrev.value = sessionPrevData;
+    developerDaily.value = developerDailyData;
     timeSeries.value = timeSeriesData;
     refererStats.value = refererData;
     refererPrev.value = refererPrevData;
@@ -808,6 +1226,7 @@ async function loadDailyReport() {
     cityPrev.value = cityPrevData;
   } catch (error) {
     console.error('加载日报失败:', error);
+    developerDaily.value = null;
   }
 }
 
@@ -817,6 +1236,10 @@ function renderTrend(stats: TimeSeriesStats) {
   }
   if (ipChart) {
     ipChart.destroy();
+    ipChart = null;
+  }
+  if (!hasPositiveSeriesValues(stats.visitors)) {
+    return;
   }
   const ctx = ipChartRef.value.getContext('2d');
   if (!ctx) {
@@ -854,12 +1277,160 @@ function renderTrend(stats: TimeSeriesStats) {
   });
 }
 
-function renderSourceDonut(groups: Record<string, number>) {
-  if (!sourceChartRef.value) {
+function renderDeveloperTrend(stats: DeveloperDailyStats['trend'] | null) {
+  if (developerTrendChart) {
+    developerTrendChart.destroy();
+    developerTrendChart = null;
+  }
+  if (!developerTrendChartRef.value || !stats) {
     return;
   }
+  const hasTrendData = [
+    stats.status4xx,
+    stats.status5xx,
+    stats.avgRequestTimeMs,
+    stats.avgUpstreamTimeMs,
+  ].some((series) => hasPositiveSeriesValues(series));
+  if (!hasTrendData) {
+    return;
+  }
+  const ctx = developerTrendChartRef.value.getContext('2d');
+  if (!ctx) {
+    return;
+  }
+  const labels = stats?.labels || [];
+  const status4xx = stats?.status4xx || [];
+  const status5xx = stats?.status5xx || [];
+  const avgRequestTimeMs = stats?.avgRequestTimeMs || [];
+  const avgUpstreamTimeMs = stats?.avgUpstreamTimeMs || [];
+  const gradient = ctx.createLinearGradient(0, 0, 0, developerTrendChartRef.value.height || 220);
+  gradient.addColorStop(0, 'rgba(30, 123, 255, 0.28)');
+  gradient.addColorStop(1, 'rgba(30, 123, 255, 0.04)');
+  const upstreamGradient = ctx.createLinearGradient(0, 0, 0, developerTrendChartRef.value.height || 220);
+  upstreamGradient.addColorStop(0, 'rgba(20, 184, 166, 0.22)');
+  upstreamGradient.addColorStop(1, 'rgba(20, 184, 166, 0.02)');
+
+  developerTrendChart = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: t('daily.dev4xxTrend'),
+          data: status4xx,
+          backgroundColor: 'rgba(249, 115, 22, 0.24)',
+          borderColor: 'rgba(249, 115, 22, 0.68)',
+          borderRadius: 10,
+          borderSkipped: false,
+          yAxisID: 'yErrors',
+          stack: 'status',
+          order: 3,
+        },
+        {
+          type: 'bar',
+          label: t('daily.dev5xxTrend'),
+          data: status5xx,
+          backgroundColor: 'rgba(239, 68, 68, 0.28)',
+          borderColor: 'rgba(239, 68, 68, 0.72)',
+          borderRadius: 10,
+          borderSkipped: false,
+          yAxisID: 'yErrors',
+          stack: 'status',
+          order: 3,
+        },
+        {
+          type: 'line',
+          label: t('daily.devLatencyTrend'),
+          data: avgRequestTimeMs,
+          borderColor: '#1e7bff',
+          backgroundColor: gradient,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          pointBackgroundColor: '#1e7bff',
+          tension: 0.35,
+          fill: true,
+          yAxisID: 'yLatency',
+          order: 1,
+        },
+        {
+          type: 'line',
+          label: t('daily.devUpstreamTrend'),
+          data: avgUpstreamTimeMs,
+          borderColor: '#14b8a6',
+          backgroundColor: upstreamGradient,
+          borderWidth: 2,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          pointBackgroundColor: '#14b8a6',
+          tension: 0.32,
+          borderDash: [6, 4],
+          fill: false,
+          yAxisID: 'yLatency',
+          order: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      scales: {
+        x: {
+          stacked: true,
+          ticks: { color: '#94a3b8', maxTicksLimit: 7 },
+          grid: { display: false },
+        },
+        yLatency: {
+          position: 'left',
+          ticks: {
+            color: '#94a3b8',
+            callback: (value) => formatAxisMs(Number(value)),
+          },
+          grid: { color: 'rgba(148, 163, 184, 0.18)' },
+        },
+        yErrors: {
+          position: 'right',
+          beginAtZero: true,
+          ticks: { color: '#94a3b8', precision: 0 },
+          stacked: true,
+          grid: { drawOnChartArea: false },
+        },
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: 10,
+            boxHeight: 10,
+            usePointStyle: true,
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              if (context.dataset.yAxisID === 'yLatency') {
+                return `${context.dataset.label}: ${formatMs(Number(context.raw || 0))}`;
+              }
+              return `${context.dataset.label}: ${formatNumber(Number(context.raw || 0))}`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderSourceDonut(groups: Record<string, number>) {
   if (sourceChart) {
     sourceChart.destroy();
+    sourceChart = null;
+  }
+  if (!sourceChartRef.value || !Object.values(groups).some((value) => value > 0)) {
+    return;
   }
   const ctx = sourceChartRef.value.getContext('2d');
   if (!ctx) {
@@ -887,17 +1458,21 @@ function renderSourceDonut(groups: Record<string, number>) {
 }
 
 function renderVisitorDonut() {
+  if (visitorChart) {
+    visitorChart.destroy();
+    visitorChart = null;
+  }
   if (!visitorChartRef.value) {
     return;
   }
-  if (visitorChart) {
-    visitorChart.destroy();
+  const current = overall.value || {};
+  if ((current.newVisitorCount || 0) + (current.returningVisitorCount || 0) <= 0) {
+    return;
   }
   const ctx = visitorChartRef.value.getContext('2d');
   if (!ctx) {
     return;
   }
-  const current = overall.value || {};
   visitorChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
@@ -920,19 +1495,23 @@ function renderVisitorDonut() {
 }
 
 function renderDeviceDonut() {
-  if (!deviceChartRef.value) {
-    return;
-  }
   if (deviceChart) {
     deviceChart.destroy();
+    deviceChart = null;
   }
-  const ctx = deviceChartRef.value.getContext('2d');
-  if (!ctx) {
+  if (!deviceChartRef.value) {
     return;
   }
   const pcCount = getDeviceCount(deviceStats.value, 'desktop');
   const iosCount = getOsCount(osStats.value, ['ios', 'iphone', 'ipad']);
   const androidCount = getOsCount(osStats.value, ['android']);
+  if (pcCount + iosCount + androidCount <= 0) {
+    return;
+  }
+  const ctx = deviceChartRef.value.getContext('2d');
+  if (!ctx) {
+    return;
+  }
   deviceChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
@@ -958,6 +1537,10 @@ function destroyCharts() {
   if (ipChart) {
     ipChart.destroy();
     ipChart = null;
+  }
+  if (developerTrendChart) {
+    developerTrendChart.destroy();
+    developerTrendChart = null;
   }
   if (sourceChart) {
     sourceChart.destroy();
@@ -1227,6 +1810,65 @@ function buildSourceIPSummary(
   });
 }
 
+function emptyDeveloperMetric(): DeveloperMetric {
+  return {
+    current: 0,
+    previous: 0,
+    delta: 0,
+    changeRate: 0,
+  };
+}
+
+function emptyDeveloperSummary() {
+  return {
+    totalRequests: 0,
+    avgRequestSizeBytes: emptyDeveloperMetric(),
+    status5xx: emptyDeveloperMetric(),
+    status4xx: emptyDeveloperMetric(),
+    avgRequestTimeMs: emptyDeveloperMetric(),
+    avgUpstreamTimeMs: emptyDeveloperMetric(),
+    slowRequests: emptyDeveloperMetric(),
+    slowRequestRate: emptyDeveloperMetric(),
+  };
+}
+
+function formatMetricValue(metric: DeveloperMetric, type: 'count' | 'ms' | 'traffic' | 'percent') {
+  const value = Number(metric?.current || 0);
+  switch (type) {
+    case 'ms':
+      return formatMs(value);
+    case 'traffic':
+      return formatTraffic(Math.round(value));
+    case 'percent':
+      return formatPercent(value);
+    default:
+      return formatNumber(Math.round(value));
+  }
+}
+
+function formatMetricDelta(metric: DeveloperMetric, type: 'count' | 'ms' | 'percent-point') {
+  const value = Number(metric?.delta || 0);
+  switch (type) {
+    case 'ms':
+      return formatSignedMs(value);
+    case 'percent-point':
+      return formatSignedPercent(value);
+    default:
+      return formatSigned(Math.round(value));
+  }
+}
+
+function formatMetricRate(metric: DeveloperMetric) {
+  return formatRate(metric?.changeRate ?? null);
+}
+
+function formatMetricShare(metric: DeveloperMetric) {
+  if (metric?.shareCurrent === undefined || metric?.shareCurrent === null) {
+    return t('common.none');
+  }
+  return formatPercent(metric.shareCurrent);
+}
+
 function formatRegion(domestic?: string, global?: string) {
   const domesticText = normalizeRegionValue(domestic);
   const globalText = normalizeRegionValue(global);
@@ -1252,6 +1894,10 @@ function calcRate(current: number, prev: number) {
     return null;
   }
   return (current - prev) / prev;
+}
+
+function hasPositiveSeriesValues(values?: Array<number | null | undefined>) {
+  return Array.isArray(values) && values.some((value) => Number(value || 0) > 0);
 }
 
 function formatNumber(value: number) {
@@ -1295,6 +1941,29 @@ function formatSignedDuration(value: number) {
   }
   const prefix = value >= 0 ? '+' : '-';
   return `${prefix}${formatDuration(Math.abs(value))}`;
+}
+
+function formatMs(value: number) {
+  const normalized = Number(value || 0);
+  if (normalized >= 1000) {
+    return `${(normalized / 1000).toFixed(normalized >= 10000 ? 1 : 2)} s`;
+  }
+  return `${Math.round(normalized)} ms`;
+}
+
+function formatSignedMs(value: number) {
+  if (value === null || value === undefined) {
+    return t('common.none');
+  }
+  const prefix = value >= 0 ? '+' : '-';
+  return `${prefix}${formatMs(Math.abs(value))}`;
+}
+
+function formatAxisMs(value: number) {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1)}s`;
+  }
+  return `${Math.round(value)}ms`;
 }
 
 function formatDuration(seconds: number) {
@@ -1441,6 +2110,80 @@ function goToLogsByIP(ip: string) {
       timeEnd: end,
     },
   });
+}
+
+function goToLogsByURL(url: string) {
+  const normalizedURL = String(url || '').trim();
+  if (!normalizedURL || !currentWebsiteId.value) {
+    return;
+  }
+  const { start, end } = buildDayTimeRange(currentDate.value);
+  router.push({
+    name: 'logs',
+    query: {
+      id: currentWebsiteId.value,
+      urlFilter: normalizedURL,
+      timeStart: start,
+      timeEnd: end,
+    },
+  });
+}
+
+function goToLogsByIssue(url: string, mode: 'all' | '5xx' | 'latency' | 'slow' | 'compare') {
+  const normalizedURL = String(url || '').trim();
+  if (!normalizedURL || !currentWebsiteId.value) {
+    return;
+  }
+
+  const extra: Record<string, string> = {
+    filter: normalizedURL,
+  };
+
+  switch (mode) {
+    case '5xx':
+      extra.statusClass = '5xx';
+      extra.sortField = 'timestamp';
+      extra.sortOrder = 'desc';
+      break;
+    case 'latency':
+      extra.sortField = 'request_time_ms';
+      extra.sortOrder = 'desc';
+      break;
+    case 'slow':
+      extra.sortField = 'request_time_ms';
+      extra.sortOrder = 'desc';
+      break;
+    case 'compare':
+      extra.sortField = 'upstream_response_time_ms';
+      extra.sortOrder = 'desc';
+      break;
+    default:
+      extra.sortField = 'timestamp';
+      extra.sortOrder = 'desc';
+      break;
+  }
+
+  goToLogsByDigest(buildDigestLogsQuery(extra));
+}
+
+function goToLogsByDigest(query: Record<string, string>) {
+  if (!currentWebsiteId.value) {
+    return;
+  }
+  router.push({
+    name: 'logs',
+    query,
+  });
+}
+
+function buildDigestLogsQuery(extra: Record<string, string>) {
+  const { start, end } = buildDayTimeRange(currentDate.value);
+  return {
+    id: currentWebsiteId.value,
+    timeStart: start,
+    timeEnd: end,
+    ...extra,
+  };
 }
 
 function buildDayTimeRange(dateStr: string) {
@@ -1603,6 +2346,48 @@ function buildDayTimeRange(dateStr: string) {
   font-weight: 600;
 }
 
+.daily-empty-state {
+  height: 100%;
+  min-height: 180px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(var(--primary-color-rgb), 0.18);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.08), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 255, 0.86));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+}
+
+.daily-empty-state-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--primary);
+  background: rgba(var(--primary-color-rgb), 0.12);
+}
+
+.daily-empty-state-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.daily-empty-state-text {
+  max-width: 240px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
 .trend-up {
   color: #ef4444;
 }
@@ -1613,6 +2398,492 @@ function buildDayTimeRange(dateStr: string) {
 
 .trend-flat {
   color: var(--muted);
+}
+
+.section-icon.danger {
+  color: #ef4444;
+  background: transparent;
+  box-shadow: none;
+}
+
+.daily-dev-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.08), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(30, 123, 255, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 255, 0.88));
+}
+
+.daily-dev-header {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.daily-dev-subtitle {
+  margin-top: -8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.daily-dev-status-strip {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(249, 250, 251, 0.8));
+  border-radius: 18px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.daily-dev-status-strip:hover {
+  border-color: rgba(var(--primary-color-rgb), 0.26);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.daily-dev-status-strip.stable {
+  border-color: rgba(34, 197, 94, 0.18);
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.82), rgba(255, 255, 255, 0.78));
+}
+
+.daily-dev-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: rgba(var(--primary-color-rgb), 0.42);
+}
+
+.daily-dev-status-dot.stable {
+  background: #22c55e;
+}
+
+.daily-dev-status-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.daily-dev-status-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.daily-dev-status-text {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.daily-dev-status-meta {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.daily-dev-status-meta.stable {
+  color: #15803d;
+}
+
+.daily-dev-digest {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.14);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.daily-dev-digest.critical {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.96), rgba(255, 255, 255, 0.8));
+}
+
+.daily-dev-digest.watch {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.96), rgba(255, 255, 255, 0.8));
+}
+
+.daily-dev-digest.stable {
+  border-color: rgba(34, 197, 94, 0.18);
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.96), rgba(255, 255, 255, 0.8));
+}
+
+.daily-dev-digest-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.daily-dev-digest-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.daily-dev-digest-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.daily-dev-digest-badge.critical {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.daily-dev-digest-badge.watch {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.daily-dev-digest-badge.stable {
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.daily-dev-digest-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.daily-dev-digest-line {
+  position: relative;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  padding-left: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.daily-dev-digest-line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(var(--primary-color-rgb), 0.5);
+}
+
+.daily-dev-digest-line:hover {
+  color: var(--primary);
+}
+
+.daily-dev-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.daily-dev-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--primary-color-rgb), 0.14);
+  background: rgba(var(--primary-color-rgb), 0.06);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.daily-dev-pill-label {
+  color: var(--muted);
+}
+
+.daily-dev-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(208px, 1fr));
+  gap: 12px;
+}
+
+.daily-dev-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 164px;
+  padding: 16px 16px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(248, 250, 255, 0.9));
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+}
+
+.daily-dev-card::after {
+  content: '';
+  position: absolute;
+  inset: auto -16% -44% auto;
+  width: 104px;
+  height: 104px;
+  border-radius: 999px;
+  background: rgba(var(--primary-color-rgb), 0.05);
+  pointer-events: none;
+}
+
+.daily-dev-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.daily-dev-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.daily-dev-card-subtitle {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.daily-dev-card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 15px;
+  border: 1px solid transparent;
+}
+
+.daily-dev-card-icon.critical {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.12);
+}
+
+.daily-dev-card-icon.warning {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.08);
+  border-color: rgba(249, 115, 22, 0.12);
+}
+
+.daily-dev-card-icon.latency {
+  color: #1e7bff;
+  background: rgba(30, 123, 255, 0.08);
+  border-color: rgba(30, 123, 255, 0.12);
+}
+
+.daily-dev-card-icon.upstream {
+  color: #14b8a6;
+  background: rgba(20, 184, 166, 0.08);
+  border-color: rgba(20, 184, 166, 0.12);
+}
+
+.daily-dev-card-icon.slow {
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.12);
+}
+
+.daily-dev-card-value {
+  margin-top: 2px;
+  font-size: 28px;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.daily-dev-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.daily-dev-card-detail {
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.daily-dev-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.daily-dev-chart-card,
+.daily-dev-table-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 16px;
+}
+
+.daily-dev-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.daily-dev-block-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.daily-dev-block-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.daily-dev-chart {
+  height: 260px;
+}
+
+.daily-dev-issue-row {
+  cursor: default;
+}
+
+.daily-dev-url-cell {
+  min-width: 0;
+}
+
+.daily-dev-cell-link {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.daily-dev-cell-link:hover .daily-dev-cell-cta,
+.daily-dev-cell-link:hover .daily-dev-url,
+.daily-dev-cell-link:hover {
+  color: var(--primary);
+}
+
+.daily-dev-url-button {
+  display: block;
+}
+
+.daily-dev-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.daily-dev-url-meta,
+.daily-dev-cell-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.daily-dev-cell-cta {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+:global(body.dark-mode) .daily-dev-section {
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.16), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(30, 123, 255, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.9));
+}
+
+:global(body.dark-mode) .daily-dev-card,
+:global(body.dark-mode) .daily-dev-digest,
+:global(body.dark-mode) .daily-dev-chart-card,
+:global(body.dark-mode) .daily-dev-table-card {
+  background: rgba(15, 23, 42, 0.78);
+  box-shadow: 0 10px 20px rgba(2, 6, 23, 0.24);
+}
+
+:global(body.dark-mode) .daily-dev-status-strip {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.76), rgba(15, 23, 42, 0.72));
+}
+
+:global(body.dark-mode) .daily-dev-status-strip:hover {
+  border-color: rgba(var(--primary-color-rgb), 0.3);
+}
+
+:global(body.dark-mode) .daily-dev-status-strip.stable {
+  border-color: rgba(34, 197, 94, 0.16);
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.28), rgba(15, 23, 42, 0.72));
+}
+
+:global(body.dark-mode) .daily-dev-status-meta {
+  color: rgba(226, 232, 240, 0.72);
+}
+
+:global(body.dark-mode) .daily-dev-status-meta.stable {
+  color: #86efac;
+}
+
+:global(body.dark-mode) .daily-dev-digest.critical {
+  background: linear-gradient(180deg, rgba(69, 10, 10, 0.5), rgba(15, 23, 42, 0.78));
+}
+
+:global(body.dark-mode) .daily-dev-digest.watch {
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.45), rgba(15, 23, 42, 0.78));
+}
+
+:global(body.dark-mode) .daily-dev-digest.stable {
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.45), rgba(15, 23, 42, 0.78));
+}
+
+:global(body.dark-mode) .daily-empty-state {
+  border-color: rgba(148, 163, 184, 0.26);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.12), transparent 56%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.56));
+  color: var(--text);
+}
+
+:global(body.dark-mode) .daily-empty-state-icon {
+  color: #8bb8ff;
+  background: rgba(var(--primary-color-rgb), 0.16);
+}
+
+:global(body.dark-mode) .daily-empty-state-title {
+  color: rgba(241, 245, 249, 0.94);
+}
+
+:global(body.dark-mode) .daily-empty-state-text {
+  color: rgba(148, 163, 184, 0.92);
 }
 
 .daily-mini-grid {
@@ -2009,6 +3280,14 @@ function buildDayTimeRange(dateStr: string) {
 }
 
 @media (max-width: 1200px) {
+  .daily-dev-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .daily-dev-grid {
+    grid-template-columns: 1fr;
+  }
+
   .daily-mini-card {
     grid-column: span 6;
   }
@@ -2042,6 +3321,26 @@ function buildDayTimeRange(dateStr: string) {
 }
 
 @media (max-width: 768px) {
+  .daily-dev-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-dev-block-header,
+  .daily-dev-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .daily-dev-status-strip {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .daily-dev-status-meta {
+    margin-left: 22px;
+    padding-left: 0;
+  }
+
   .daily-date-control {
     width: 100%;
   }

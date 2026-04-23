@@ -75,6 +75,40 @@ func TestBuildRegexFromFormatSupportsRequestTimeAndRequestID(t *testing.T) {
 	}
 }
 
+func TestDefaultNginxParserParsesExtendedTraceSuffix(t *testing.T) {
+	parser, err := newLogLineParser(config.WebsiteConfig{LogType: "nginx"}, nil)
+	if err != nil {
+		t.Fatalf("newLogLineParser(nginx) error: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	line := `203.0.113.10 - - [` + now.Format(defaultNginxTimeLayout) + `] "GET / HTTP/2.0" 200 59302 "-" "Blackbox Exporter/0.24.0" 0.134 33 0.133 172.16.7.133:7004 www.qcb.cn req-456`
+
+	p := &LogParser{retentionDays: 30}
+	record, err := p.parseRegexLogLine(parser, line)
+	if err != nil {
+		t.Fatalf("parseRegexLogLine error: %v", err)
+	}
+	if record.RequestTimeMs != 134 {
+		t.Fatalf("unexpected request_time_ms: %d", record.RequestTimeMs)
+	}
+	if record.RequestLength != 33 {
+		t.Fatalf("unexpected request_length: %d", record.RequestLength)
+	}
+	if record.UpstreamTimeMs != 133 {
+		t.Fatalf("unexpected upstream_response_time_ms: %d", record.UpstreamTimeMs)
+	}
+	if record.UpstreamAddr != "172.16.7.133:7004" {
+		t.Fatalf("unexpected upstream_addr: %q", record.UpstreamAddr)
+	}
+	if record.Host != "www.qcb.cn" {
+		t.Fatalf("unexpected host: %q", record.Host)
+	}
+	if record.RequestID != "req-456" {
+		t.Fatalf("unexpected request_id: %q", record.RequestID)
+	}
+}
+
 func mustCompileRegex(t *testing.T, pattern string) *regexp.Regexp {
 	t.Helper()
 	regex, err := regexp.Compile(pattern)

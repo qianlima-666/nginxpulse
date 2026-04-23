@@ -418,49 +418,71 @@ grep sshd /var/log/messages | tail -n 80
 ```
 
 ### Push Agent（实时推送）
-适合内网或边缘节点场景，通过独立进程实时推送日志行。
+适合内网、边缘节点、Kubernetes 节点或不方便把日志目录挂载到 NginxPulse 主服务的场景。Agent 是一个独立采集进程，它在日志服务器上读取本地日志新增行，然后推送到 NginxPulse 主服务的 `POST /api/ingest/logs`。
+
 > 术语说明：这里的 Agent 指日志采集代理进程，不是 AI 大模型 Agent（LLM Agent）。
 
-你需要在 **两台机器** 上分别做以下事：
+#### Agent 是哪个包
+仓库里有三个可用入口：
 
-#### 解析服务器（运行 NginxPulse 的机器）
-1) 启动 nginxpulse（确保后端 `:8089` 可访问）。
-2) 建议启用访问密钥：设置 `ACCESS_KEYS`（或配置文件 `system.accessKeys`）。
-3) 获取 `websiteID`：请求 `GET /api/websites`。
-4) 如需为 agent 指定解析格式，在站点配置中添加 `type=agent` 的 source（仅用于解析覆盖）：
+- 源码入口：`cmd/nginxpulse-agent`
+- 预编译二进制：
+  - `prebuilt/nginxpulse-agent-linux-amd64`
+  - `prebuilt/nginxpulse-agent-darwin-arm64`
+- 容器构建文件：`Dockerfile.agent`
+
+构建二进制：
+```bash
+go build -trimpath -ldflags="-s -w" -o bin/nginxpulse-agent ./cmd/nginxpulse-agent
+```
+
+构建容器镜像：
+```bash
+docker build -f Dockerfile.agent -t nginxpulse-agent:local .
+```
+
+#### 工作方式
+Agent 不直接连接 PostgreSQL，也不读取 NginxPulse 的数据目录。它只做三件事：
+
+1. 按 `routes[].paths` 读取日志服务器上的本地文件。
+2. 维护进程内 offset，持续读取新增行。
+3. 批量 POST 到主服务 `/api/ingest/logs`，由主服务按站点解析、去重、入库。
+
+首次读取大文件时，Agent 默认只从文件尾部读取最近 `8MiB`，避免第一次部署就把历史日志全量灌入主服务。需要全量回放时，将 `initialTailBytes` 设为 `-1`。
+
+#### 主服务配置（运行 NginxPulse 的机器）
+1) 确保主服务 HTTP 地址能被日志服务器访问，例如 `http://10.0.0.5:8089`。
+2) 建议启用访问密钥：设置环境变量 `ACCESS_KEYS`，或配置 `system.accessKeys`。
+3) 获取 `websiteID`：
+```bash
+curl -H "X-NginxPulse-Key: your-key" http://10.0.0.5:8089/api/websites
+```
+返回中的 `id` 就是 Agent 配置里的 `websiteID`。
+
+4) 如果日志格式使用站点默认解析规则，可以不写 `sources`。如果想给 Agent 单独指定解析格式，在站点配置中添加 `type=agent` 的 source，且 `id` 必须等于 Agent 的 `sourceID`：
 ```json
 {
   "name": "主站",
+  "domains": ["example.com", "www.example.com"],
   "sources": [
     {
       "id": "agent-main",
       "type": "agent",
       "parse": {
-        "logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\""
+        "logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $host"
       }
     }
   ]
 }
 ```
 
-#### 日志服务器（存放日志的机器）
-1) 准备 agent（构建或使用预构建）。
+`type=agent` 的 source 只用于识别 `sourceID` 和解析覆盖，不会被主服务定期扫描。
 
-构建：
-```bash
-go build -o bin/nginxpulse-agent ./cmd/nginxpulse-agent
-```
-仓库已提供预构建二进制：
-- `prebuilt/nginxpulse-agent-darwin-arm64`
-- `prebuilt/nginxpulse-agent-linux-amd64`
-
-2) 在日志服务器上创建配置文件（填写解析服务器地址与 `websiteID`）。
-   - `websiteID` 在解析服务器上通过接口获取（支持多站点时可取多个）：
-     `curl http://<nginxpulse-server>:8089/api/websites`
-     返回的 `id` 字段就是 `websiteID`。
+#### Agent 配置（日志服务器）
+创建 `/etc/nginxpulse/agent.json`：
 ```json
 {
-  "server": "http://<nginxpulse-server>:8089",
+  "server": "http://10.0.0.5:8089",
   "accessKey": "your-key",
   "routes": [
     {
@@ -480,17 +502,107 @@ go build -o bin/nginxpulse-agent ./cmd/nginxpulse-agent
 }
 ```
 
-3) 运行 agent：
-```bash
-./bin/nginxpulse-agent -config configs/nginxpulse_agent.json
+字段说明：
+
+- `server`: NginxPulse 主服务地址，不要写 `/api/ingest/logs`，Agent 会自动拼接。
+- `accessKey`: 对应主服务 `ACCESS_KEYS` / `system.accessKeys`；未启用访问密钥时可留空。
+- `routes`: 多站点/多日志路径配置。每个 route 对应一个站点和一个 `sourceID`。
+- `routes[].websiteID`: 主服务 `/api/websites` 返回的站点 ID。
+- `routes[].sourceID`: 推送来源 ID。若主服务站点配置了 `type=agent` source，这里必须与该 source 的 `id` 一致。
+- `routes[].paths`: 日志服务器上的本地文件路径。当前 Agent 读取普通文本日志，跳过 `.gz` 文件。
+- `pollInterval`: 读取新增日志的间隔，默认 `1s`。
+- `batchSize`: pending 行数达到该值时立即推送，默认 `200`。
+- `flushInterval`: 即使未达到 `batchSize`，也会按该间隔推送已有 pending 行，默认 `2s`。
+- `initialTailBytes`: 首次读取大文件时只读末尾 N 字节；`0` 使用默认 `8MiB`，`-1` 表示从文件头开始。
+- `initialMaxLines`: 首次读取最多行数，`0` 表示不额外限制。
+- `maxPendingLines`: 单 route 内存缓冲上限，默认 `5000`；网络异常时达到上限会暂停读取。
+- `maxLineBytes`: 单行最大字节数，默认 `262144`（256KiB），超长行会跳过。
+- `requestTimeout`: 推送请求超时，默认 `90s`。
+- `retryBackoffMin` / `retryBackoffMax`: 推送失败后的指数退避范围，默认 `1s` / `30s`。
+- `exitOnMaxBackoff`: 达到最大退避后再次失败是否退出进程，适合 Kubernetes/systemd 交给外部重启。
+
+单站点旧写法仍可用：
+```json
+{
+  "server": "http://10.0.0.5:8089",
+  "accessKey": "your-key",
+  "websiteID": "abcd",
+  "sourceID": "agent-main",
+  "paths": ["/var/log/nginx/access.log"],
+  "pollInterval": "1s"
+}
 ```
 
-注意事项：
-- 日志服务器需要能访问解析服务器的 `http://<nginxpulse-server>:8089/api/ingest/logs`。
-- 如需为 agent 指定解析格式，可在 `sources` 内配置 `type=agent` 且 `id=sourceID`，并填写 `parse` 覆盖。
-- `routes` 为空时，仍兼容旧字段 `websiteID` / `sourceID` / `paths`（单站点模式）。
-- 每个 route 应使用不同日志路径；同一路径重复配置会被拒绝，避免重复采集。
-- agent 会跳过 `.gz` 文件；日志轮转导致文件变小会自动从头开始读取。
+#### 运行方式
+直接运行：
+```bash
+./bin/nginxpulse-agent -config /etc/nginxpulse/agent.json
+```
+
+systemd 示例：
+```ini
+[Unit]
+Description=NginxPulse Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/nginxpulse-agent -config /etc/nginxpulse/agent.json
+Restart=always
+RestartSec=5s
+User=nginx
+Group=nginx
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Docker 示例：
+```bash
+docker run -d --name nginxpulse-agent \
+  -v /etc/nginxpulse/agent.json:/etc/nginxpulse/agent.json:ro \
+  -v /var/log/nginx:/var/log/nginx:ro \
+  nginxpulse-agent:local
+```
+
+#### 环境变量覆盖
+配置文件为主，以下环境变量可覆盖部分运行参数，方便 Docker/Kubernetes 管理：
+
+- `NGINXPULSE_AGENT_POLL_INTERVAL`
+- `NGINXPULSE_AGENT_FLUSH_INTERVAL`
+- `NGINXPULSE_AGENT_INITIAL_TAIL_BYTES`
+- `NGINXPULSE_AGENT_INITIAL_MAX_LINES`
+- `NGINXPULSE_AGENT_BATCH_SIZE`
+- `NGINXPULSE_AGENT_REQUEST_TIMEOUT`
+- `NGINXPULSE_AGENT_MAX_PENDING_LINES`
+- `NGINXPULSE_AGENT_MAX_LINE_BYTES`
+- `NGINXPULSE_AGENT_RETRY_BACKOFF_MIN`
+- `NGINXPULSE_AGENT_RETRY_BACKOFF_MAX`
+- `NGINXPULSE_AGENT_EXIT_ON_MAX_BACKOFF`
+
+#### 验证与排障
+1) 检查主服务连通性：
+```bash
+curl -i -H "X-NginxPulse-Key: your-key" http://10.0.0.5:8089/healthz
+```
+
+2) 检查站点 ID：
+```bash
+curl -H "X-NginxPulse-Key: your-key" http://10.0.0.5:8089/api/websites
+```
+
+3) 启动 Agent 后观察日志：
+- `config loaded`: 配置加载成功，会打印 `endpoint`、`routes`、`batch_size`。
+- `read new lines`: 已从本地日志读到新增行。
+- `push succeeded`: 已推送到主服务。
+- `日志推送失败，将按退避重试`: 网络、访问密钥、站点 ID 或主服务解析异常。
+
+常见问题：
+- `401 Unauthorized`: `accessKey` 与主服务 `ACCESS_KEYS` 不一致，或主服务启用了访问密钥但 Agent 没配置。
+- `400 站点不存在`: `websiteID` 写错，重新请求 `/api/websites`。
+- 有 `push succeeded` 但前端没数据：检查 `sourceID` 对应的解析格式；如果日志里带 `$host`，确认站点 `domains` 与 Host 匹配。
+- 没有 `read new lines`: 检查容器挂载、文件权限、路径是否存在；Agent 只读普通文本日志，跳过 `.gz`。
+- Agent 重启后没有从头读历史日志：这是默认行为。需要全量回放时设置 `"initialTailBytes": -1`。
 
 ## 常见注意点
 - 若重启后重复解析，请确认没有残留进程占用同一端口。

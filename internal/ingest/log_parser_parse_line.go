@@ -125,8 +125,7 @@ func (p *LogParser) parseRegexLogLine(parser *logLineParser, line string) (*stor
 		}
 	}
 
-	requestLength := parseIntField(extractField(matches, parser.indexMap, requestLengthAliases))
-	requestTimeMs := extractRequestTimeMs(matches, parser.indexMap)
+	requestLength, requestTimeMs := extractRequestMetrics(matches, parser.indexMap)
 	upstreamTimeMs := parseMillisecondsField(extractField(matches, parser.indexMap, upstreamTimeAliases), false)
 	upstreamAddr := normalizeOptionalField(extractField(matches, parser.indexMap, upstreamAddrAliases))
 	host := normalizeOptionalField(extractField(matches, parser.indexMap, hostAliases))
@@ -427,6 +426,32 @@ func extractRequestTimeMs(matches []string, indexMap map[string]int) int64 {
 	return parseMillisecondsField(extractField(matches, indexMap, []string{"request_time", "duration"}), false)
 }
 
+func extractRequestMetrics(matches []string, indexMap map[string]int) (int, int64) {
+	requestLength := parseIntField(extractField(matches, indexMap, requestLengthAliases))
+	requestTimeMs := extractRequestTimeMs(matches, indexMap)
+	if requestLength > 0 || requestTimeMs > 0 {
+		return requestLength, requestTimeMs
+	}
+
+	first := extractField(matches, indexMap, []string{"trace_first"})
+	second := extractField(matches, indexMap, []string{"trace_second"})
+	if first == "" || second == "" {
+		return 0, 0
+	}
+
+	if looksLikeDurationToken(first) {
+		if length, ok := parseIntToken(second); ok {
+			return length, parseMillisecondsField(first, false)
+		}
+	}
+	if looksLikeDurationToken(second) {
+		if length, ok := parseIntToken(first); ok {
+			return length, parseMillisecondsField(second, false)
+		}
+	}
+	return 0, 0
+}
+
 func parseIntField(raw string) int {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" || trimmed == "-" {
@@ -437,6 +462,29 @@ func parseIntField(raw string) int {
 		return 0
 	}
 	return parsed
+}
+
+func parseIntToken(raw string) (int, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "-" {
+		return 0, false
+	}
+	parsed, err := strconv.Atoi(trimmed)
+	if err != nil || parsed < 0 {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func looksLikeDurationToken(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "-" {
+		return false
+	}
+	if strings.Contains(trimmed, ".") {
+		return true
+	}
+	return durationUnitPattern.MatchString(trimmed)
 }
 
 func parseMillisecondsField(raw string, assumeMilliseconds bool) int64 {

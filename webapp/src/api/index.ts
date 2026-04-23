@@ -13,12 +13,14 @@ import type {
   LogsExportListResponse,
   IPGeoAPIFailureListResponse,
   AlertPushTestResponse,
+  DeveloperDailyStats,
   RefererIPBatchStats,
   SimpleSeriesStats,
   SystemNotificationListResponse,
   TimeSeriesStats,
   IPGeoOverrideResponse,
   IPGeoOverrideMutationResponse,
+  VersionInfoResponse,
   WebsiteInfo,
   WebsitesResponse,
 } from './types';
@@ -43,6 +45,11 @@ export const fetchWebsites = async (): Promise<WebsiteInfo[]> => {
 
 export const fetchAppStatus = async (): Promise<AppStatusResponse> => {
   const response = await client.get<ApiResponse<AppStatusResponse>>('api/status');
+  return response.data;
+};
+
+export const fetchVersionInfo = async (): Promise<VersionInfoResponse> => {
+  const response = await client.get<ApiResponse<VersionInfoResponse>>('api/version');
   return response.data;
 };
 
@@ -188,6 +195,11 @@ export const fetchOverallStats = (
   timeRange: string,
   entryLimit?: number
 ): Promise<Record<string, any>> => fetchStats('overall', { id: websiteId, timeRange, entryLimit });
+
+export const fetchDeveloperDailyStats = (
+  websiteId: string,
+  timeRange: string
+): Promise<DeveloperDailyStats> => fetchStats('developer_daily', { id: websiteId, timeRange });
 
 export const fetchUrlStats = (
   websiteId: string,

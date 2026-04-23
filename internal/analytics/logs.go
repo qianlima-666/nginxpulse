@@ -54,10 +54,12 @@ type LogsStats struct {
 	ParsingPendingRange                *TimeRange `json:"parsing_pending_range,omitempty"`
 	ParsingPendingProgress             int        `json:"parsing_pending_progress,omitempty"`
 	Pagination                         struct {
-		Total    int `json:"total"`
-		Page     int `json:"page"`
-		PageSize int `json:"pageSize"`
-		Pages    int `json:"pages"`
+		Total    int  `json:"total"`
+		Page     int  `json:"page"`
+		PageSize int  `json:"pageSize"`
+		Pages    int  `json:"pages"`
+		HasMore  bool `json:"hasMore"`
+		Exact    bool `json:"exact"`
 	} `json:"pagination"`
 }
 
@@ -323,6 +325,11 @@ func (m *LogsStatsManager) Query(query StatsQuery) (StatsResult, error) {
 		return result, err
 	}
 	fastPath := canUseFastLogsPath(sortField, options, distinctIP)
+	exactCount := shouldUseExactLogsCount(options)
+	queryLimit := pageSize
+	if !exactCount {
+		queryLimit++
+	}
 	orderClause := buildLogsOrderClause(column(sortField), sortOrder, fmt.Sprintf("%s.id", logAlias))
 	baseOrderClause := buildLogsOrderClause(baseColumn(sortField), sortOrder, baseColumn("id"))
 	fastPathOrderClause := buildLogsOrderClause(fastPathColumn(sortField), sortOrder, fastPathColumn("id"))
@@ -487,7 +494,7 @@ func (m *LogsStatsManager) Query(query StatsQuery) (StatsResult, error) {
 		} else {
 			args = append(args, fullArgs...)
 		}
-		args = append(args, pageSize, offset)
+		args = append(args, queryLimit, offset)
 	} else if !fastPath {
 		if len(fullConditions) > 0 {
 			queryBuilder.WriteString(" WHERE ")
@@ -497,9 +504,9 @@ func (m *LogsStatsManager) Query(query StatsQuery) (StatsResult, error) {
 		queryBuilder.WriteString(fmt.Sprintf(" ORDER BY %s", orderClause))
 
 		queryBuilder.WriteString(" LIMIT ? OFFSET ?")
-		args = append(args, pageSize, offset)
+		args = append(args, queryLimit, offset)
 	} else {
-		args = append(args, pageSize, offset)
+		args = append(args, queryLimit, offset)
 	}
 
 	selectStartedAt := time.Now()
@@ -548,47 +555,60 @@ func (m *LogsStatsManager) Query(query StatsQuery) (StatsResult, error) {
 	}
 	selectDuration = time.Since(selectStartedAt)
 
-	// 查询总记录数
-	var countQuery strings.Builder
+	var total int
 	countNeedsJoin := needsLogsJoinForFilters(options) || (includeNewVisitor && newVisitorFilter != "all")
-	if countNeedsJoin {
-		countQuery.WriteString(fmt.Sprintf(`
+	countDuration := time.Duration(0)
+	hasMore := false
+	if exactCount {
+		// 查询总记录数
+		var countQuery strings.Builder
+		if countNeedsJoin {
+			countQuery.WriteString(fmt.Sprintf(`
         SELECT %s
         FROM "%s" %s
         %s
         %s`,
-			countSelect(distinctIP), tableName, logAlias, joinClause, firstSeenJoin))
-	} else {
-		countQuery.WriteString(fmt.Sprintf(`SELECT %s FROM "%s" %s`, countSelect(distinctIP), tableName, logAlias))
-	}
+				countSelect(distinctIP), tableName, logAlias, joinClause, firstSeenJoin))
+		} else {
+			countQuery.WriteString(fmt.Sprintf(`SELECT %s FROM "%s" %s`, countSelect(distinctIP), tableName, logAlias))
+		}
 
-	countConditions := fullConditions
-	countArgs := fullArgs
-	if !countNeedsJoin {
-		countConditions = baseConditions
-		countArgs = baseArgs
-	}
-	if len(countConditions) > 0 {
-		countQuery.WriteString(" WHERE ")
-		countQuery.WriteString(strings.Join(countConditions, " AND "))
-	}
+		countConditions := fullConditions
+		countArgs := fullArgs
+		if !countNeedsJoin {
+			countConditions = baseConditions
+			countArgs = baseArgs
+		}
+		if len(countConditions) > 0 {
+			countQuery.WriteString(" WHERE ")
+			countQuery.WriteString(strings.Join(countConditions, " AND "))
+		}
 
-	var total int
-	countStartedAt := time.Now()
-	countQueryStr := sqlutil.ReplacePlaceholders(countQuery.String())
-	err = m.repo.GetDB().QueryRow(countQueryStr, countArgs...).Scan(&total)
-	if err != nil {
-		return result, fmt.Errorf("获取日志总数失败: %v", err)
+		countStartedAt := time.Now()
+		countQueryStr := sqlutil.ReplacePlaceholders(countQuery.String())
+		err = m.repo.GetDB().QueryRow(countQueryStr, countArgs...).Scan(&total)
+		if err != nil {
+			return result, fmt.Errorf("获取日志总数失败: %v", err)
+		}
+		countDuration = time.Since(countStartedAt)
+	} else if len(logs) > pageSize {
+		hasMore = true
+		logs = logs[:pageSize]
 	}
-	countDuration := time.Since(countStartedAt)
 
 	// 设置返回结果
 	result.Logs = logs
 	result.Pagination.Total = total
 	result.Pagination.Page = page
 	result.Pagination.PageSize = pageSize
-	result.Pagination.Pages = (total + pageSize - 1) / pageSize
-	logSlowLogsQuery(query.WebsiteID, page, pageSize, sortField, sortOrder, options, distinctIP, fastPath, !countNeedsJoin, len(logs), total, selectDuration, countDuration, time.Since(queryStartedAt))
+	result.Pagination.Exact = exactCount
+	if exactCount {
+		result.Pagination.Pages = (total + pageSize - 1) / pageSize
+		result.Pagination.HasMore = page < result.Pagination.Pages
+	} else {
+		result.Pagination.HasMore = hasMore
+	}
+	logSlowLogsQuery(query.WebsiteID, page, pageSize, sortField, sortOrder, options, distinctIP, fastPath, exactCount, !countNeedsJoin, len(logs), total, selectDuration, countDuration, time.Since(queryStartedAt))
 
 	return result, nil
 }
@@ -598,6 +618,19 @@ func countSelect(distinctIP bool) string {
 		return "COUNT(DISTINCT l.ip_id)"
 	}
 	return "COUNT(*)"
+}
+
+func shouldUseExactLogsCount(opts logsQueryOptions) bool {
+	// 宽查询直接做精确 COUNT(*)/COUNT(DISTINCT) 很容易扫全表，优先退化为 has_more 分页。
+	return opts.timeRange != "" ||
+		opts.timeStart > 0 ||
+		opts.timeEnd > 0 ||
+		opts.filter != "" ||
+		opts.ipFilter != "" ||
+		opts.locationFilter != "" ||
+		opts.urlFilter != "" ||
+		opts.statusCode > 0 ||
+		opts.includeNewVisitor
 }
 
 func buildLogsConditions(column func(string) string, opts logsQueryOptions) ([]string, []interface{}, error) {
@@ -723,6 +756,7 @@ func logSlowLogsQuery(
 	opts logsQueryOptions,
 	distinctIP bool,
 	fastPath bool,
+	exactCount bool,
 	countFastPath bool,
 	rows int,
 	total int,
@@ -742,6 +776,7 @@ func logSlowLogsQuery(
 		"sort_order":       sortOrder,
 		"distinct_ip":      distinctIP,
 		"fast_path":        fastPath,
+		"count_exact":      exactCount,
 		"count_fast_path":  countFastPath,
 		"rows":             rows,
 		"total":            total,

@@ -46,32 +46,39 @@
           <span>{{ activeTitle }}</span>
         </div>
       </div>
-      <div class="realtime-metric">
-        <div class="realtime-value">{{ formatCount(activeCount) }}</div>
-        <div class="realtime-mini-bars">
-          <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
+      <template v-if="hasRealtimeOverviewData">
+        <div class="realtime-metric">
+          <div class="realtime-value">{{ formatCount(activeCount) }}</div>
+          <div class="realtime-mini-bars">
+            <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
+          </div>
         </div>
-      </div>
-      <div class="realtime-subtitle">{{ deviceSubtitle }}</div>
+        <div class="realtime-subtitle">{{ deviceSubtitle }}</div>
         <div class="realtime-device-cards">
-        <div class="realtime-device-card">
-          <div class="realtime-device-icon"><i class="ri-computer-line"></i></div>
-          <div class="realtime-device-label">{{ t('realtime.pc') }}</div>
-          <div class="realtime-device-count">{{ formatCount(deviceStats.pc.count) }}</div>
-          <div class="realtime-device-rate">{{ formatPercent(deviceStats.pc.percent) }}</div>
+          <div class="realtime-device-card">
+            <div class="realtime-device-icon"><i class="ri-computer-line"></i></div>
+            <div class="realtime-device-label">{{ t('realtime.pc') }}</div>
+            <div class="realtime-device-count">{{ formatCount(deviceStats.pc.count) }}</div>
+            <div class="realtime-device-rate">{{ formatPercent(deviceStats.pc.percent) }}</div>
+          </div>
+          <div class="realtime-device-card">
+            <div class="realtime-device-icon"><i class="ri-smartphone-line"></i></div>
+            <div class="realtime-device-label">{{ t('realtime.mobile') }}</div>
+            <div class="realtime-device-count">{{ formatCount(deviceStats.mobile.count) }}</div>
+            <div class="realtime-device-rate">{{ formatPercent(deviceStats.mobile.percent) }}</div>
+          </div>
+          <div class="realtime-device-card">
+            <div class="realtime-device-icon"><i class="ri-shield-line"></i></div>
+            <div class="realtime-device-label">{{ t('realtime.other') }}</div>
+            <div class="realtime-device-count">{{ formatCount(deviceStats.other.count) }}</div>
+            <div class="realtime-device-rate">{{ formatPercent(deviceStats.other.percent) }}</div>
+          </div>
         </div>
-        <div class="realtime-device-card">
-          <div class="realtime-device-icon"><i class="ri-smartphone-line"></i></div>
-          <div class="realtime-device-label">{{ t('realtime.mobile') }}</div>
-          <div class="realtime-device-count">{{ formatCount(deviceStats.mobile.count) }}</div>
-          <div class="realtime-device-rate">{{ formatPercent(deviceStats.mobile.percent) }}</div>
-        </div>
-        <div class="realtime-device-card">
-          <div class="realtime-device-icon"><i class="ri-shield-line"></i></div>
-          <div class="realtime-device-label">{{ t('realtime.other') }}</div>
-          <div class="realtime-device-count">{{ formatCount(deviceStats.other.count) }}</div>
-          <div class="realtime-device-rate">{{ formatPercent(deviceStats.other.percent) }}</div>
-        </div>
+      </template>
+      <div v-else class="realtime-empty-state">
+        <span class="realtime-empty-state-icon"><i class="ri-radar-line"></i></span>
+        <div class="realtime-empty-state-title">{{ t('realtime.overviewEmptyTitle') }}</div>
+        <div class="realtime-empty-state-text">{{ t('realtime.overviewEmptyText') }}</div>
       </div>
     </div>
 
@@ -96,35 +103,39 @@
           </span>
         </button>
       </div>
-      <div class="realtime-top">
-        <span class="realtime-rank" :class="{ asc: sortOrders.referer === 'asc' }">{{ getRankLabel(sortOrders.referer) }}</span>
-        <div class="realtime-top-title">{{ topReferer.name }}</div>
-        <div class="realtime-top-meta">
-          <span class="realtime-top-count">{{ formatCount(topReferer.count) }}</span>
-          <span class="realtime-top-rate">{{ formatPercent(topReferer.percent) }}</span>
+      <template v-if="hasRefererData">
+        <div class="realtime-top">
+          <span class="realtime-rank" :class="{ asc: sortOrders.referer === 'asc' }">{{ getRankLabel(sortOrders.referer) }}</span>
+          <div class="realtime-top-title">{{ topReferer.name }}</div>
+          <div class="realtime-top-meta">
+            <span class="realtime-top-count">{{ formatCount(topReferer.count) }}</span>
+            <span class="realtime-top-rate">{{ formatPercent(topReferer.percent) }}</span>
+          </div>
         </div>
-      </div>
-      <div class="realtime-mini-bars">
-        <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
-      </div>
-      <div class="table-wrapper">
-        <table class="ranking-table realtime-table">
-          <thead>
-            <tr>
-              <th>{{ t('realtime.referer') }}</th>
-              <th class="realtime-count-col">{{ t('realtime.topVisitors') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!refererItems.length" class="realtime-empty-row">
-              <td colspan="2">{{ t('realtime.noData') }}</td>
-            </tr>
-            <tr v-else v-for="item in refererItems" :key="item.name">
-              <td :title="item.name">{{ item.name }}</td>
-              <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="realtime-mini-bars">
+          <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
+        </div>
+        <div class="table-wrapper">
+          <table class="ranking-table realtime-table">
+            <thead>
+              <tr>
+                <th>{{ t('realtime.referer') }}</th>
+                <th class="realtime-count-col">{{ t('realtime.topVisitors') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in refererItems" :key="item.name">
+                <td :title="item.name">{{ item.name }}</td>
+                <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <div v-else class="realtime-empty-state">
+        <span class="realtime-empty-state-icon"><i class="ri-compass-3-line"></i></span>
+        <div class="realtime-empty-state-title">{{ t('realtime.refererEmptyTitle') }}</div>
+        <div class="realtime-empty-state-text">{{ t('realtime.refererEmptyText') }}</div>
       </div>
     </div>
 
@@ -149,35 +160,39 @@
           </span>
         </button>
       </div>
-      <div class="realtime-top">
-        <span class="realtime-rank" :class="{ asc: sortOrders.page === 'asc' }">{{ getRankLabel(sortOrders.page) }}</span>
-        <div class="realtime-top-title">{{ topPage.name }}</div>
-        <div class="realtime-top-meta">
-          <span class="realtime-top-count">{{ formatCount(topPage.count) }}</span>
-          <span class="realtime-top-rate">{{ formatPercent(topPage.percent) }}</span>
+      <template v-if="hasPageData">
+        <div class="realtime-top">
+          <span class="realtime-rank" :class="{ asc: sortOrders.page === 'asc' }">{{ getRankLabel(sortOrders.page) }}</span>
+          <div class="realtime-top-title">{{ topPage.name }}</div>
+          <div class="realtime-top-meta">
+            <span class="realtime-top-count">{{ formatCount(topPage.count) }}</span>
+            <span class="realtime-top-rate">{{ formatPercent(topPage.percent) }}</span>
+          </div>
         </div>
-      </div>
-      <div class="realtime-mini-bars">
-        <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
-      </div>
-      <div class="table-wrapper">
-        <table class="ranking-table realtime-table">
-          <thead>
-            <tr>
-              <th>{{ t('realtime.pages') }}</th>
-              <th class="realtime-count-col">{{ t('realtime.viewCount') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!pageItems.length" class="realtime-empty-row">
-              <td colspan="2">{{ t('realtime.noData') }}</td>
-            </tr>
-            <tr v-else v-for="item in pageItems" :key="item.name">
-              <td :title="item.name">{{ item.name }}</td>
-              <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="realtime-mini-bars">
+          <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
+        </div>
+        <div class="table-wrapper">
+          <table class="ranking-table realtime-table">
+            <thead>
+              <tr>
+                <th>{{ t('realtime.pages') }}</th>
+                <th class="realtime-count-col">{{ t('realtime.viewCount') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in pageItems" :key="item.name">
+                <td :title="item.name">{{ item.name }}</td>
+                <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <div v-else class="realtime-empty-state">
+        <span class="realtime-empty-state-icon"><i class="ri-pages-line"></i></span>
+        <div class="realtime-empty-state-title">{{ t('realtime.pagesEmptyTitle') }}</div>
+        <div class="realtime-empty-state-text">{{ t('realtime.pagesEmptyText') }}</div>
       </div>
     </div>
 
@@ -202,35 +217,39 @@
           </span>
         </button>
       </div>
-      <div class="realtime-top">
-        <span class="realtime-rank" :class="{ asc: sortOrders.entry === 'asc' }">{{ getRankLabel(sortOrders.entry) }}</span>
-        <div class="realtime-top-title">{{ topEntry.name }}</div>
-        <div class="realtime-top-meta">
-          <span class="realtime-top-count">{{ formatCount(topEntry.count) }}</span>
-          <span class="realtime-top-rate">{{ formatPercent(topEntry.percent) }}</span>
+      <template v-if="hasEntryData">
+        <div class="realtime-top">
+          <span class="realtime-rank" :class="{ asc: sortOrders.entry === 'asc' }">{{ getRankLabel(sortOrders.entry) }}</span>
+          <div class="realtime-top-title">{{ topEntry.name }}</div>
+          <div class="realtime-top-meta">
+            <span class="realtime-top-count">{{ formatCount(topEntry.count) }}</span>
+            <span class="realtime-top-rate">{{ formatPercent(topEntry.percent) }}</span>
+          </div>
         </div>
-      </div>
-      <div class="realtime-mini-bars">
-        <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
-      </div>
-      <div class="table-wrapper">
-        <table class="ranking-table realtime-table">
-          <thead>
-            <tr>
-              <th>{{ t('realtime.entryPages') }}</th>
-              <th class="realtime-count-col">{{ t('realtime.entryCount') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!entryItems.length" class="realtime-empty-row">
-              <td colspan="2">{{ t('realtime.noData') }}</td>
-            </tr>
-            <tr v-else v-for="item in entryItems" :key="item.name">
-              <td :title="item.name">{{ item.name }}</td>
-              <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="realtime-mini-bars">
+          <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
+        </div>
+        <div class="table-wrapper">
+          <table class="ranking-table realtime-table">
+            <thead>
+              <tr>
+                <th>{{ t('realtime.entryPages') }}</th>
+                <th class="realtime-count-col">{{ t('realtime.entryCount') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in entryItems" :key="item.name">
+                <td :title="item.name">{{ item.name }}</td>
+                <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <div v-else class="realtime-empty-state">
+        <span class="realtime-empty-state-icon"><i class="ri-login-circle-line"></i></span>
+        <div class="realtime-empty-state-title">{{ t('realtime.entryEmptyTitle') }}</div>
+        <div class="realtime-empty-state-text">{{ t('realtime.entryEmptyText') }}</div>
       </div>
     </div>
 
@@ -255,35 +274,39 @@
           </span>
         </button>
       </div>
-      <div class="realtime-top">
-        <span class="realtime-rank" :class="{ asc: sortOrders.browser === 'asc' }">{{ getRankLabel(sortOrders.browser) }}</span>
-        <div class="realtime-top-title">{{ topBrowser.name }}</div>
-        <div class="realtime-top-meta">
-          <span class="realtime-top-count">{{ formatCount(topBrowser.count) }}</span>
-          <span class="realtime-top-rate">{{ formatPercent(topBrowser.percent) }}</span>
+      <template v-if="hasBrowserData">
+        <div class="realtime-top">
+          <span class="realtime-rank" :class="{ asc: sortOrders.browser === 'asc' }">{{ getRankLabel(sortOrders.browser) }}</span>
+          <div class="realtime-top-title">{{ topBrowser.name }}</div>
+          <div class="realtime-top-meta">
+            <span class="realtime-top-count">{{ formatCount(topBrowser.count) }}</span>
+            <span class="realtime-top-rate">{{ formatPercent(topBrowser.percent) }}</span>
+          </div>
         </div>
-      </div>
-      <div class="realtime-mini-bars">
-        <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
-      </div>
-      <div class="table-wrapper">
-        <table class="ranking-table realtime-table">
-          <thead>
-            <tr>
-              <th>{{ t('realtime.browser') }}</th>
-              <th class="realtime-count-col">{{ t('realtime.topVisitors') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!browserItems.length" class="realtime-empty-row">
-              <td colspan="2">{{ t('realtime.noData') }}</td>
-            </tr>
-            <tr v-else v-for="item in browserItems" :key="item.name">
-              <td>{{ item.name }}</td>
-              <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="realtime-mini-bars">
+          <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
+        </div>
+        <div class="table-wrapper">
+          <table class="ranking-table realtime-table">
+            <thead>
+              <tr>
+                <th>{{ t('realtime.browser') }}</th>
+                <th class="realtime-count-col">{{ t('realtime.topVisitors') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in browserItems" :key="item.name">
+                <td>{{ item.name }}</td>
+                <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <div v-else class="realtime-empty-state">
+        <span class="realtime-empty-state-icon"><i class="ri-global-line"></i></span>
+        <div class="realtime-empty-state-title">{{ t('realtime.browserEmptyTitle') }}</div>
+        <div class="realtime-empty-state-text">{{ t('realtime.browserEmptyText') }}</div>
       </div>
     </div>
 
@@ -308,35 +331,39 @@
           </span>
         </button>
       </div>
-      <div class="realtime-top">
-        <span class="realtime-rank" :class="{ asc: sortOrders.city === 'asc' }">{{ getRankLabel(sortOrders.city) }}</span>
-        <div class="realtime-top-title">{{ topCity.name }}</div>
-        <div class="realtime-top-meta">
-          <span class="realtime-top-count">{{ formatCount(topCity.count) }}</span>
-          <span class="realtime-top-rate">{{ formatPercent(topCity.percent) }}</span>
+      <template v-if="hasCityData">
+        <div class="realtime-top">
+          <span class="realtime-rank" :class="{ asc: sortOrders.city === 'asc' }">{{ getRankLabel(sortOrders.city) }}</span>
+          <div class="realtime-top-title">{{ topCity.name }}</div>
+          <div class="realtime-top-meta">
+            <span class="realtime-top-count">{{ formatCount(topCity.count) }}</span>
+            <span class="realtime-top-rate">{{ formatPercent(topCity.percent) }}</span>
+          </div>
         </div>
-      </div>
-      <div class="realtime-mini-bars">
-        <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
-      </div>
-      <div class="table-wrapper">
-        <table class="ranking-table realtime-table">
-          <thead>
-            <tr>
-              <th>{{ t('realtime.location') }}</th>
-              <th class="realtime-count-col">{{ t('realtime.topVisitors') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!cityItems.length" class="realtime-empty-row">
-              <td colspan="2">{{ t('realtime.noData') }}</td>
-            </tr>
-            <tr v-else v-for="item in cityItems" :key="item.name">
-              <td>{{ item.name }}</td>
-              <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="realtime-mini-bars">
+          <span v-for="(bar, index) in activeBars" :key="index" :class="{ active: bar.active }" :style="{ height: `${bar.height}px` }"></span>
+        </div>
+        <div class="table-wrapper">
+          <table class="ranking-table realtime-table">
+            <thead>
+              <tr>
+                <th>{{ t('realtime.location') }}</th>
+                <th class="realtime-count-col">{{ t('realtime.topVisitors') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in cityItems" :key="item.name">
+                <td>{{ item.name }}</td>
+                <td class="realtime-count-col">{{ formatCount(item.count) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <div v-else class="realtime-empty-state">
+        <span class="realtime-empty-state-icon"><i class="ri-map-pin-2-line"></i></span>
+        <div class="realtime-empty-state-title">{{ t('realtime.locationEmptyTitle') }}</div>
+        <div class="realtime-empty-state-text">{{ t('realtime.locationEmptyText') }}</div>
       </div>
     </div>
   </section>
@@ -452,6 +479,16 @@ const topPage = computed(() => getTopItem(pageItems.value));
 const topEntry = computed(() => getTopItem(entryItems.value));
 const topBrowser = computed(() => getTopItem(browserItems.value));
 const topCity = computed(() => getTopItem(cityItems.value));
+const hasRealtimeOverviewData = computed(() =>
+  activeCount.value > 0 ||
+  activeSeries.value.some((value) => Number(value || 0) > 0) ||
+  deviceStats.value.pc.count + deviceStats.value.mobile.count + deviceStats.value.other.count > 0
+);
+const hasRefererData = computed(() => refererItems.value.length > 0);
+const hasPageData = computed(() => pageItems.value.length > 0);
+const hasEntryData = computed(() => entryItems.value.length > 0);
+const hasBrowserData = computed(() => browserItems.value.length > 0);
+const hasCityData = computed(() => cityItems.value.length > 0);
 
 onMounted(() => {
   initWindowFromPreference();
@@ -882,6 +919,69 @@ function formatPercent(value: number) { return n(Number(value || 0), 'percent');
 
 .realtime-empty-row td {
   background: transparent !important;
+}
+
+.realtime-empty-state {
+  flex: 1;
+  min-height: 180px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(var(--primary-color-rgb), 0.18);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.08), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 255, 0.86));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+}
+
+.realtime-empty-state-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--primary);
+  background: rgba(var(--primary-color-rgb), 0.12);
+}
+
+.realtime-empty-state-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.realtime-empty-state-text {
+  max-width: 240px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+:global(body.dark-mode) .realtime-empty-state {
+  border-color: rgba(148, 163, 184, 0.26);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.12), transparent 56%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.56));
+  color: var(--text);
+}
+
+:global(body.dark-mode) .realtime-empty-state-icon {
+  color: #8bb8ff;
+  background: rgba(var(--primary-color-rgb), 0.16);
+}
+
+:global(body.dark-mode) .realtime-empty-state-title {
+  color: rgba(241, 245, 249, 0.94);
+}
+
+:global(body.dark-mode) .realtime-empty-state-text {
+  color: rgba(148, 163, 184, 0.92);
 }
 
 @media (max-width: 1200px) {

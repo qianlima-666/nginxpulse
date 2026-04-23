@@ -29,6 +29,14 @@ export interface AppStatusResponse {
   config_readonly?: boolean;
 }
 
+export interface VersionInfoResponse {
+  version?: string;
+  git_commit?: string;
+  latest_version?: string;
+  latest_release_url?: string;
+  update_available?: boolean;
+}
+
 export interface SourceConfig {
   [key: string]: any;
 }
@@ -122,6 +130,55 @@ export interface TimeSeriesStats {
   labels: string[];
   visitors: number[];
   pageviews: number[];
+}
+
+export interface DeveloperMetric {
+  current: number;
+  previous: number;
+  delta: number;
+  changeRate?: number | null;
+  shareCurrent?: number | null;
+  sharePrevious?: number | null;
+}
+
+export interface DeveloperDailySummary {
+  totalRequests: number;
+  avgRequestSizeBytes: DeveloperMetric;
+  status5xx: DeveloperMetric;
+  status4xx: DeveloperMetric;
+  avgRequestTimeMs: DeveloperMetric;
+  avgUpstreamTimeMs: DeveloperMetric;
+  slowRequests: DeveloperMetric;
+  slowRequestRate: DeveloperMetric;
+}
+
+export interface DeveloperDailyTrend {
+  labels: string[];
+  status4xx: number[];
+  status5xx: number[];
+  avgRequestTimeMs: number[];
+  avgUpstreamTimeMs: number[];
+  slowRequestRate: number[];
+}
+
+export interface DeveloperDailyURLIssue {
+  url: string;
+  requests: number;
+  errors5xx: number;
+  errors5xxDelta: number;
+  slowRequests: number;
+  avgRequestTimeMs: number;
+  avgRequestTimeDeltaMs: number;
+  maxRequestTimeMs: number;
+}
+
+export interface DeveloperDailyStats {
+  currentDate: string;
+  previousDate: string;
+  slowThresholdMs: number;
+  summary: DeveloperDailySummary;
+  trend: DeveloperDailyTrend;
+  topIssues: DeveloperDailyURLIssue[];
 }
 
 export interface SimpleSeriesStats {

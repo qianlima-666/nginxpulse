@@ -36,7 +36,14 @@
       </div>
       <div class="setup-grid">
         <aside class="setup-rail">
-        <div v-if="!isManageMode" class="setup-brand">
+        <a
+          v-if="!isManageMode"
+          class="setup-brand brand"
+          href="https://github.com/likaia/nginxpulse/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open NginxPulse GitHub repository"
+        >
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-initials">NP</span>
             <svg class="brand-pulse" viewBox="0 0 32 16" role="presentation" aria-hidden="true">
@@ -54,7 +61,7 @@
             <div class="brand-title">NginxPulse</div>
             <div class="brand-sub">{{ t(subtitleKey) }}</div>
           </div>
-        </div>
+        </a>
         <ol class="setup-steps" role="list">
           <li
             v-for="(step, index) in steps"

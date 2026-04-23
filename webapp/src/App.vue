@@ -3,7 +3,13 @@
     <SetupPage v-if="setupRequired" />
     <template v-else>
       <aside v-if="!hideSidebar" class="sidebar">
-        <div class="brand">
+        <a
+          class="brand"
+          href="https://github.com/likaia/nginxpulse/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open NginxPulse GitHub repository"
+        >
           <div class="brand-mark" aria-hidden="true">
             <span class="brand-initials">NP</span>
             <svg class="brand-pulse" viewBox="0 0 32 16" role="presentation" aria-hidden="true">
@@ -21,7 +27,7 @@
             <div class="brand-title">NginxPulse</div>
             <div class="brand-sub">{{ t('app.brand.subtitle') }}</div>
           </div>
-        </div>
+        </a>
       <nav class="menu">
         <RouterLink to="/" class="menu-item" :class="{ active: isActive('/') }">{{ t('app.menu.overview') }}</RouterLink>
         <RouterLink to="/daily" class="menu-item" :class="{ active: isActive('/daily') }">{{ t('app.menu.daily') }}</RouterLink>
@@ -76,7 +82,19 @@
         </div>
         <div v-if="versionText" class="app-version">
           <span class="app-version-dot" aria-hidden="true"></span>
-          <span>{{ versionText }}</span>
+          <span class="app-version-current">{{ versionText }}</span>
+          <a
+            v-if="updateAvailable && latestVersion && latestReleaseUrl"
+            class="app-version-update"
+            :href="latestReleaseUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            :title="t('app.version.viewRelease', { value: latestVersion })"
+            :aria-label="t('app.version.viewRelease', { value: latestVersion })"
+          >
+            <i class="ri-upload-cloud-2-line" aria-hidden="true"></i>
+            <span>{{ t('app.version.updateAvailable', { value: latestVersion }) }}</span>
+          </a>
         </div>
       </div>
     </aside>
@@ -120,7 +138,7 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 import { usePrimeVue } from 'primevue/config';
 import { useI18n } from 'vue-i18n';
-import { fetchAppStatus } from '@/api';
+import { fetchAppStatus, fetchVersionInfo } from '@/api';
 import { ACCESS_KEY_STORAGE, saveAccessKey, setAccessKeyExpireDays } from '@/api/client';
 import { getLocaleFromQuery, getStoredLocale, normalizeLocale, setLocale } from '@/i18n';
 import { primevueLocales } from '@/i18n/primevue';
@@ -158,6 +176,9 @@ const accessKeyInput = ref(localStorage.getItem(ACCESS_KEY_STORAGE) || '');
 const accessKeyErrorKey = ref<string | null>(null);
 const accessKeyErrorText = ref('');
 const accessKeyReloadToken = ref(0);
+const latestVersion = ref('');
+const latestReleaseUrl = ref('');
+const updateAvailable = ref(false);
 
 const languageOptions = computed(() => {
   const _locale = locale.value;
@@ -170,6 +191,22 @@ const languageOptions = computed(() => {
 const currentLocale = computed({
   get: () => normalizeLocale(locale.value),
   set: (value: string) => setLocale(normalizeLocale(value)),
+});
+
+const previewUpdateQuery = computed(() => {
+  const value = route.query.previewUpdate;
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+});
+
+const previewVersionQuery = computed(() => {
+  const value = route.query.previewVersion;
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
 });
 
 const applyTheme = (value: boolean) => {
@@ -207,6 +244,10 @@ watch(locale, (value) => {
   primevue.config.locale = primevueLocales[normalized];
 });
 
+watch([previewUpdateQuery, previewVersionQuery], () => {
+  void refreshVersionInfo();
+});
+
 provide('theme', {
   isDark,
   toggle: toggleTheme,
@@ -239,6 +280,7 @@ async function refreshAppStatus() {
     if (!hasStoredLocale && !hasQueryLocale && status.language) {
       setLocale(normalizeLocale(status.language), false);
     }
+    void refreshVersionInfo();
   } catch (error) {
     const message = error instanceof Error ? error.message : t('common.requestFailed');
     if (message.toLowerCase().includes('key') || message.includes('密钥')) {
@@ -248,6 +290,46 @@ async function refreshAppStatus() {
       console.error('获取系统状态失败:', error);
     }
   }
+}
+
+async function refreshVersionInfo() {
+  if (!appVersion.value) {
+    latestVersion.value = '';
+    latestReleaseUrl.value = '';
+    updateAvailable.value = false;
+    return;
+  }
+
+  const previewVersion = resolvePreviewVersion();
+  if (previewVersion) {
+    latestVersion.value = previewVersion;
+    latestReleaseUrl.value = `https://github.com/likaia/nginxpulse/releases/tag/${previewVersion}`;
+    updateAvailable.value = true;
+    return;
+  }
+
+  try {
+    const info = await fetchVersionInfo();
+    latestVersion.value = info.latest_version ?? '';
+    latestReleaseUrl.value = info.latest_release_url ?? '';
+    updateAvailable.value = Boolean(info.update_available && info.latest_version && info.latest_release_url);
+  } catch (error) {
+    console.warn('获取版本更新信息失败:', error);
+  }
+}
+
+function resolvePreviewVersion() {
+  const raw = String(previewUpdateQuery.value ?? '').trim().toLowerCase();
+  if (!raw || ['0', 'false', 'no', 'off'].includes(raw)) {
+    return '';
+  }
+
+  const previewVersion = String(previewVersionQuery.value ?? '').trim();
+  if (previewVersion) {
+    return previewVersion.startsWith('v') ? previewVersion : `v${previewVersion}`;
+  }
+
+  return 'v1.6.18';
 }
 
 function handleAccessKeyEvent(event: Event) {
@@ -469,6 +551,12 @@ const accessKeyErrorMessage = computed(() => {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.app-version-current {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .app-version-dot {
@@ -477,5 +565,52 @@ const accessKeyErrorMessage = computed(() => {
   border-radius: var(--radius-pill);
   background: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.app-version-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.22);
+  background: linear-gradient(135deg, rgba(var(--primary-color-rgb), 0.1), rgba(var(--primary-color-rgb), 0.04));
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 10px 18px rgba(var(--primary-color-rgb), 0.12);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.app-version-update:hover {
+  border-color: rgba(var(--primary-color-rgb), 0.34);
+  background: linear-gradient(135deg, rgba(var(--primary-color-rgb), 0.16), rgba(var(--primary-color-rgb), 0.07));
+  box-shadow: 0 12px 22px rgba(var(--primary-color-rgb), 0.16);
+}
+
+.app-version-update:focus-visible {
+  outline: 2px solid rgba(var(--primary-color-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.app-version-update i {
+  font-size: 12px;
+}
+
+:global(body.dark-mode) .app-version-current {
+  color: #dbe5f4;
+}
+
+:global(body.dark-mode) .app-version-update {
+  border-color: rgba(90, 162, 255, 0.28);
+  background: linear-gradient(135deg, rgba(90, 162, 255, 0.18), rgba(90, 162, 255, 0.08));
+  color: #91c3ff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.3);
+}
+
+:global(body.dark-mode) .app-version-update:hover {
+  border-color: rgba(90, 162, 255, 0.42);
+  background: linear-gradient(135deg, rgba(90, 162, 255, 0.26), rgba(90, 162, 255, 0.12));
 }
 </style>

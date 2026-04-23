@@ -39,3 +39,21 @@ func TestBuildLogsOrderClause(t *testing.T) {
 		t.Fatalf("unexpected order clause: got %q want %q", got, want)
 	}
 }
+
+func TestShouldUseExactLogsCount(t *testing.T) {
+	if shouldUseExactLogsCount(logsQueryOptions{}) {
+		t.Fatalf("expected broad query to skip exact count")
+	}
+	if shouldUseExactLogsCount(logsQueryOptions{pageviewOnly: true}) {
+		t.Fatalf("expected pageview-only query to skip exact count")
+	}
+	if !shouldUseExactLogsCount(logsQueryOptions{timeStart: 1710000000}) {
+		t.Fatalf("expected time-bounded query to keep exact count")
+	}
+	if !shouldUseExactLogsCount(logsQueryOptions{filter: "/api"}) {
+		t.Fatalf("expected keyword search to keep exact count")
+	}
+	if !shouldUseExactLogsCount(logsQueryOptions{statusCode: 500}) {
+		t.Fatalf("expected exact status code filter to keep exact count")
+	}
+}

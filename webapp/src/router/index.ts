@@ -1,10 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { getWebBasePathWithSlash } from '@/utils';
-import OverviewPage from '@/pages/OverviewPage.vue';
-import DailyPage from '@/pages/DailyPage.vue';
-import RealtimePage from '@/pages/RealtimePage.vue';
-import LogsPage from '@/pages/LogsPage.vue';
-import SetupPage from '@/pages/SetupPage.vue';
+
+const OverviewPage = () => import('@/pages/OverviewPage.vue');
+const DailyPage = () => import('@/pages/DailyPage.vue');
+const RealtimePage = () => import('@/pages/RealtimePage.vue');
+const LogsPage = () => import('@/pages/LogsPage.vue');
+const SetupPage = () => import('@/pages/SetupPage.vue');
 
 const router = createRouter({
   history: createWebHistory(getWebBasePathWithSlash()),

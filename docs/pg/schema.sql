@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS "{{website_id}}_nginx_logs" (
   upstream_addr TEXT NOT NULL DEFAULT '',
   host TEXT NOT NULL DEFAULT '',
   request_id TEXT NOT NULL DEFAULT '',
+  fingerprint TEXT,
   referer_id BIGINT NOT NULL,
   ua_id BIGINT NOT NULL,
   location_id BIGINT NOT NULL,
@@ -176,8 +177,20 @@ CREATE INDEX IF NOT EXISTS "idx_{{website_id}}_session_key"
   ON "{{website_id}}_nginx_logs"(ip_id, ua_id, timestamp)
   WHERE pageview_flag = 1;
 
+CREATE INDEX IF NOT EXISTS "idx_{{website_id}}_ip_location"
+  ON "{{website_id}}_nginx_logs"(ip_id, location_id);
+
+CREATE INDEX IF NOT EXISTS "idx_{{website_id}}_location_ip"
+  ON "{{website_id}}_nginx_logs"(location_id, ip_id);
+
 CREATE INDEX IF NOT EXISTS "idx_{{website_id}}_sessions_start"
   ON "{{website_id}}_sessions"(start_ts);
 
+CREATE INDEX IF NOT EXISTS "idx_{{website_id}}_sessions_start_entry"
+  ON "{{website_id}}_sessions"(start_ts, entry_url_id);
+
 CREATE INDEX IF NOT EXISTS "idx_{{website_id}}_sessions_key"
   ON "{{website_id}}_sessions"(ip_id, ua_id, end_ts);
+
+CREATE INDEX IF NOT EXISTS "idx_{{website_id}}_sessions_ip_loc"
+  ON "{{website_id}}_sessions"(ip_id, location_id);

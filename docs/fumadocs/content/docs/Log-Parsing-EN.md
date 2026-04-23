@@ -311,48 +311,71 @@ If formats differ across sources, override parsing per source:
 ```
 
 ### Push Agent (Realtime)
-Designed for internal networks or edge nodes. Logs are pushed in real time.
+Use the Push Agent when logs are on another machine, edge node, Kubernetes node, or any environment where mounting the log directory into the NginxPulse server is inconvenient. The agent is a standalone collector process: it reads local text log files on the log server and pushes new lines to the NginxPulse server through `POST /api/ingest/logs`.
 
-You need to set up **two machines**:
+> Terminology: Agent here means the log collection process, not an AI/LLM agent.
 
-#### Parsing server (runs NginxPulse)
-1) Start nginxpulse (ensure backend `:8089` is reachable).
-2) Recommend enabling access keys: `ACCESS_KEYS` (or `system.accessKeys`).
-3) Get `websiteID`: call `GET /api/websites`.
-4) If you need a custom format for the agent, add a `type=agent` source for parse override:
+#### Which package is the Agent?
+The repository provides three usable entry points:
+
+- Source entry: `cmd/nginxpulse-agent`
+- Prebuilt binaries:
+  - `prebuilt/nginxpulse-agent-linux-amd64`
+  - `prebuilt/nginxpulse-agent-darwin-arm64`
+- Container build file: `Dockerfile.agent`
+
+Build a binary:
+```bash
+go build -trimpath -ldflags="-s -w" -o bin/nginxpulse-agent ./cmd/nginxpulse-agent
+```
+
+Build a container image:
+```bash
+docker build -f Dockerfile.agent -t nginxpulse-agent:local .
+```
+
+#### How it works
+The agent does not connect to PostgreSQL and does not read the NginxPulse data directory. It only does three things:
+
+1. Reads local files configured in `routes[].paths` on the log server.
+2. Keeps in-process file offsets and continuously reads appended lines.
+3. Batches lines to the server endpoint `/api/ingest/logs`; the server handles site matching, parsing, deduplication, and database writes.
+
+On first read of a large file, the agent defaults to tailing only the latest `8MiB` to avoid flooding the server and PostgreSQL with historical logs during initial deployment. Set `initialTailBytes` to `-1` if you intentionally want a full replay from the beginning of the file.
+
+#### Server setup (machine running NginxPulse)
+1) Make sure the server HTTP address is reachable from the log server, for example `http://10.0.0.5:8089`.
+2) Access keys are recommended: set `ACCESS_KEYS` or `system.accessKeys`.
+3) Get `websiteID`:
+```bash
+curl -H "X-NginxPulse-Key: your-key" http://10.0.0.5:8089/api/websites
+```
+The `id` field in the response is the `websiteID` used by the agent config.
+
+4) If the site default parser already matches your logs, you do not need to configure `sources`. If you want a parser dedicated to agent-pushed logs, add a `type=agent` source and make its `id` equal the agent `sourceID`:
 ```json
 {
   "name": "Main Site",
+  "domains": ["example.com", "www.example.com"],
   "sources": [
     {
       "id": "agent-main",
       "type": "agent",
       "parse": {
-        "logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\""
+        "logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $host"
       }
     }
   ]
 }
 ```
 
-#### Log server (stores logs)
-1) Prepare the agent (build or use prebuilt).
+The `type=agent` source only identifies the pushed `sourceID` and provides parse overrides. The NginxPulse server does not periodically scan this source.
 
-Build:
-```bash
-go build -o bin/nginxpulse-agent ./cmd/nginxpulse-agent
-```
-Prebuilt binaries:
-- `prebuilt/nginxpulse-agent-darwin-arm64`
-- `prebuilt/nginxpulse-agent-linux-amd64`
-
-2) Create agent config on the log server (fill in parsing server and `websiteID`).
-   - Fetch `websiteID` from the parsing server (you can pick multiple for multi-site):
-     `curl http://<nginxpulse-server>:8089/api/websites`
-     The `id` field is the `websiteID`.
+#### Agent config (log server)
+Create `/etc/nginxpulse/agent.json`:
 ```json
 {
-  "server": "http://<nginxpulse-server>:8089",
+  "server": "http://10.0.0.5:8089",
   "accessKey": "your-key",
   "routes": [
     {
@@ -372,17 +395,107 @@ Prebuilt binaries:
 }
 ```
 
-3) Run the agent:
-```bash
-./bin/nginxpulse-agent -config configs/nginxpulse_agent.json
+Field notes:
+
+- `server`: NginxPulse server address. Do not include `/api/ingest/logs`; the agent appends it automatically.
+- `accessKey`: matches server-side `ACCESS_KEYS` / `system.accessKeys`; leave empty only when access keys are disabled.
+- `routes`: multi-site and multi-path routing. Each route maps local files to one site and one `sourceID`.
+- `routes[].websiteID`: site ID returned by the server endpoint `/api/websites`.
+- `routes[].sourceID`: pushed source ID. If the site has a `type=agent` source, this value must match that source `id`.
+- `routes[].paths`: local text log files on the log server. The current agent reads plain text logs and skips `.gz` files.
+- `pollInterval`: interval for reading appended lines, default `1s`.
+- `batchSize`: push immediately when pending lines reach this count, default `200`.
+- `flushInterval`: push pending lines at this interval even if `batchSize` has not been reached, default `2s`.
+- `initialTailBytes`: on first read, start from the last N bytes; `0` uses the default `8MiB`, `-1` starts from the beginning.
+- `initialMaxLines`: max lines during first read; `0` means no extra limit.
+- `maxPendingLines`: in-memory pending line limit per route, default `5000`; when full, reading pauses until pushes succeed.
+- `maxLineBytes`: max bytes for one log line, default `262144` (256KiB); longer lines are skipped.
+- `requestTimeout`: push request timeout, default `90s`.
+- `retryBackoffMin` / `retryBackoffMax`: exponential backoff range after push failures, default `1s` / `30s`.
+- `exitOnMaxBackoff`: exit after another failure at max backoff, useful when systemd or Kubernetes should restart the process.
+
+Legacy single-site config is still supported:
+```json
+{
+  "server": "http://10.0.0.5:8089",
+  "accessKey": "your-key",
+  "websiteID": "abcd",
+  "sourceID": "agent-main",
+  "paths": ["/var/log/nginx/access.log"],
+  "pollInterval": "1s"
+}
 ```
 
-Notes:
-- The log server must reach `http://<nginxpulse-server>:8089/api/ingest/logs`.
-- To override parsing, set a `type=agent` source with `id=sourceID` and fill `parse`.
-- If `routes` is empty, legacy fields `websiteID` / `sourceID` / `paths` still work (single-site mode).
-- Each route should use different log file paths; duplicated paths across routes are rejected to avoid duplicate ingestion.
-- The agent skips `.gz` files; if a log file shrinks (rotation), it restarts from the beginning.
+#### Running the agent
+Run directly:
+```bash
+./bin/nginxpulse-agent -config /etc/nginxpulse/agent.json
+```
+
+systemd example:
+```ini
+[Unit]
+Description=NginxPulse Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/nginxpulse-agent -config /etc/nginxpulse/agent.json
+Restart=always
+RestartSec=5s
+User=nginx
+Group=nginx
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Docker example:
+```bash
+docker run -d --name nginxpulse-agent \
+  -v /etc/nginxpulse/agent.json:/etc/nginxpulse/agent.json:ro \
+  -v /var/log/nginx:/var/log/nginx:ro \
+  nginxpulse-agent:local
+```
+
+#### Environment overrides
+The config file is the primary source. These environment variables can override selected runtime options, which is useful for Docker/Kubernetes:
+
+- `NGINXPULSE_AGENT_POLL_INTERVAL`
+- `NGINXPULSE_AGENT_FLUSH_INTERVAL`
+- `NGINXPULSE_AGENT_INITIAL_TAIL_BYTES`
+- `NGINXPULSE_AGENT_INITIAL_MAX_LINES`
+- `NGINXPULSE_AGENT_BATCH_SIZE`
+- `NGINXPULSE_AGENT_REQUEST_TIMEOUT`
+- `NGINXPULSE_AGENT_MAX_PENDING_LINES`
+- `NGINXPULSE_AGENT_MAX_LINE_BYTES`
+- `NGINXPULSE_AGENT_RETRY_BACKOFF_MIN`
+- `NGINXPULSE_AGENT_RETRY_BACKOFF_MAX`
+- `NGINXPULSE_AGENT_EXIT_ON_MAX_BACKOFF`
+
+#### Verification and troubleshooting
+1) Check server connectivity:
+```bash
+curl -i -H "X-NginxPulse-Key: your-key" http://10.0.0.5:8089/healthz
+```
+
+2) Check site IDs:
+```bash
+curl -H "X-NginxPulse-Key: your-key" http://10.0.0.5:8089/api/websites
+```
+
+3) After starting the agent, watch its logs:
+- `config loaded`: config loaded successfully; the log includes `endpoint`, `routes`, and `batch_size`.
+- `read new lines`: new local log lines were read.
+- `push succeeded`: lines were pushed to the server.
+- `日志推送失败，将按退避重试`: network, access key, site ID, or server parse error.
+
+Common issues:
+- `401 Unauthorized`: `accessKey` does not match server `ACCESS_KEYS`, or the server has access keys enabled but the agent config is missing one.
+- `400 site not found`: wrong `websiteID`; fetch `/api/websites` again.
+- `push succeeded` but no frontend data: check the parse config for the matching `sourceID`; if the log contains `$host`, confirm site `domains` match the Host value.
+- No `read new lines`: check container mounts, file permissions, and paths. The agent reads plain text logs and skips `.gz`.
+- Agent restart does not read all history: this is the default tailing behavior. Set `"initialTailBytes": -1` when you need full replay.
 
 ## Notes
 - If reparse happens on restart, make sure no stale process is running.

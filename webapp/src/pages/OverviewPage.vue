@@ -231,7 +231,12 @@
           </div>
         </div>
         <div class="chart-wrap">
-          <canvas ref="visitsChartRef"></canvas>
+          <canvas v-show="hasVisitsTrendData" ref="visitsChartRef"></canvas>
+          <div v-if="!chartError && !hasVisitsTrendData" class="overview-empty-state">
+            <span class="overview-empty-state-icon"><i class="ri-line-chart-line"></i></span>
+            <div class="overview-empty-state-title">{{ t('overview.trendEmptyTitle') }}</div>
+            <div class="overview-empty-state-text">{{ t('overview.trendEmptyText') }}</div>
+          </div>
           <div v-if="chartError" class="chart-error-message">{{ chartError }}</div>
         </div>
       </div>
@@ -243,7 +248,12 @@
           </div>
         </div>
         <div class="chart-mini">
-          <canvas ref="newOldChartRef"></canvas>
+          <canvas v-show="hasNewOldData" ref="newOldChartRef"></canvas>
+          <div v-if="!hasNewOldData" class="overview-empty-state overview-empty-state-compact">
+            <span class="overview-empty-state-icon"><i class="ri-user-heart-line"></i></span>
+            <div class="overview-empty-state-title">{{ t('overview.newOldEmptyTitle') }}</div>
+            <div class="overview-empty-state-text">{{ t('overview.newOldEmptyText') }}</div>
+          </div>
         </div>
         <div class="mini-cards">
           <div class="mini-card blue">
@@ -270,7 +280,7 @@
           <button class="link-button" @click="openDetail('referer')">{{ t('overview.detail') }}</button>
         </div>
         <div class="table-wrapper">
-          <table class="ranking-table">
+          <table v-if="overviewLoading || refererRows.length > 0" class="ranking-table">
             <thead>
               <tr>
                 <th class="domain-col">{{ t('overview.refererSite') }}</th>
@@ -280,9 +290,6 @@
             <tbody>
               <tr v-if="overviewLoading">
                 <td colspan="2">{{ t('common.loading') }}</td>
-              </tr>
-              <tr v-else-if="refererRows.length === 0">
-                <td colspan="2">{{ t('common.noData') }}</td>
               </tr>
               <tr v-else v-for="row in refererRows" :key="row.label">
                 <td class="item-path" :title="row.label">{{ row.label }}</td>
@@ -298,6 +305,11 @@
               </tr>
             </tbody>
           </table>
+          <div v-else class="overview-empty-state overview-empty-state-table">
+            <span class="overview-empty-state-icon"><i class="ri-compass-3-line"></i></span>
+            <div class="overview-empty-state-title">{{ t('overview.refererEmptyTitle') }}</div>
+            <div class="overview-empty-state-text">{{ t('overview.refererEmptyText') }}</div>
+          </div>
         </div>
       </div>
       <div class="card list-card" data-anim>
@@ -309,7 +321,7 @@
           <button class="link-button" @click="openDetail('url')">{{ t('overview.detail') }}</button>
         </div>
         <div class="table-wrapper">
-          <table class="ranking-table">
+          <table v-if="overviewLoading || urlRows.length > 0" class="ranking-table">
             <thead>
               <tr>
                 <th class="url-col">{{ t('common.url') }}</th>
@@ -319,9 +331,6 @@
             <tbody>
               <tr v-if="overviewLoading">
                 <td colspan="2">{{ t('common.loading') }}</td>
-              </tr>
-              <tr v-else-if="urlRows.length === 0">
-                <td colspan="2">{{ t('common.noData') }}</td>
               </tr>
               <tr v-else v-for="row in urlRows" :key="row.label">
                 <td class="item-path" :title="row.label">{{ row.label }}</td>
@@ -337,6 +346,11 @@
               </tr>
             </tbody>
           </table>
+          <div v-else class="overview-empty-state overview-empty-state-table">
+            <span class="overview-empty-state-icon"><i class="ri-pages-line"></i></span>
+            <div class="overview-empty-state-title">{{ t('overview.topPageEmptyTitle') }}</div>
+            <div class="overview-empty-state-text">{{ t('overview.topPageEmptyText') }}</div>
+          </div>
         </div>
       </div>
       <div class="card list-card" data-anim>
@@ -348,7 +362,7 @@
           <button class="link-button" @click="openDetail('entry')">{{ t('overview.detail') }}</button>
         </div>
         <div class="table-wrapper">
-          <table class="ranking-table">
+          <table v-if="overviewLoading || entryRows.length > 0" class="ranking-table">
             <thead>
               <tr>
                 <th class="url-col">{{ t('common.url') }}</th>
@@ -358,9 +372,6 @@
             <tbody>
               <tr v-if="overviewLoading">
                 <td colspan="2">{{ t('common.loading') }}</td>
-              </tr>
-              <tr v-else-if="entryRows.length === 0">
-                <td colspan="2">{{ t('common.noData') }}</td>
               </tr>
               <tr v-else v-for="row in entryRows" :key="row.label">
                 <td class="item-path" :title="row.label">{{ row.label }}</td>
@@ -376,6 +387,11 @@
               </tr>
             </tbody>
           </table>
+          <div v-else class="overview-empty-state overview-empty-state-table">
+            <span class="overview-empty-state-icon"><i class="ri-door-open-line"></i></span>
+            <div class="overview-empty-state-title">{{ t('overview.entryPageEmptyTitle') }}</div>
+            <div class="overview-empty-state-text">{{ t('overview.entryPageEmptyText') }}</div>
+          </div>
         </div>
       </div>
     </section>
@@ -410,7 +426,7 @@
         <div v-if="geoPending" class="geo-pending-note">
           {{ t('overview.geoPendingNotice') }}
         </div>
-        <div class="geo-content">
+        <div v-if="hasGeoData" class="geo-content">
           <div class="map-container">
             <div id="geo-map" ref="geoMapRef"></div>
           </div>
@@ -442,6 +458,11 @@
             </table>
           </div>
         </div>
+        <div v-else class="overview-empty-state geo-empty-state">
+          <span class="overview-empty-state-icon"><i class="ri-map-pin-2-line"></i></span>
+          <div class="overview-empty-state-title">{{ t('overview.geoEmptyTitle') }}</div>
+          <div class="overview-empty-state-text">{{ t('overview.geoEmptyText') }}</div>
+        </div>
       </div>
       <div class="card device-card" data-anim>
         <div class="card-header">
@@ -452,7 +473,12 @@
           <button class="link-button" @click="openDetail('device')">{{ t('overview.detail') }}</button>
         </div>
         <div class="device-chart">
-          <canvas ref="deviceChartRef"></canvas>
+          <canvas v-show="hasDeviceData" ref="deviceChartRef"></canvas>
+          <div v-if="!hasDeviceData" class="overview-empty-state overview-empty-state-compact">
+            <span class="overview-empty-state-icon"><i class="ri-device-line"></i></span>
+            <div class="overview-empty-state-title">{{ t('overview.deviceEmptyTitle') }}</div>
+            <div class="overview-empty-state-text">{{ t('overview.deviceEmptyText') }}</div>
+          </div>
         </div>
         <div class="device-cards">
           <div class="device-mini blue">
@@ -598,7 +624,21 @@
             {{ detailIpGeoParsingMessage }}
           </div>
           <div class="detail-list">
-            <div class="table-wrapper">
+            <div
+              v-if="!showDetailLoading && !detailError && ((detailMode !== 'logs' && detailRankingRows.length === 0) || (detailMode === 'logs' && detailLogRows.length === 0))"
+              class="detail-empty-state"
+            >
+              <span class="detail-empty-state-icon">
+                <i :class="detailMode === 'logs' ? 'ri-file-search-line' : 'ri-bar-chart-box-line'"></i>
+              </span>
+              <div class="detail-empty-state-title">
+                {{ detailMode === 'logs' ? t('overview.detailLogsEmptyTitle') : t('overview.detailEmptyTitle') }}
+              </div>
+              <div class="detail-empty-state-text">
+                {{ detailMode === 'logs' ? t('overview.detailLogsEmptyText') : t('overview.detailEmptyText') }}
+              </div>
+            </div>
+            <div v-else class="table-wrapper">
               <table class="ranking-table" :class="{ 'detail-logs': detailMode === 'logs' }">
                 <thead>
                   <tr>
@@ -615,10 +655,7 @@
                     <td :colspan="detailColumns.length">{{ t('common.requestFailed') }}</td>
                   </tr>
                   <template v-else-if="detailMode !== 'logs'">
-                    <tr v-if="detailRankingRows.length === 0">
-                      <td :colspan="detailColumns.length">{{ t('common.noData') }}</td>
-                    </tr>
-                    <tr v-else v-for="row in detailRankingRows" :key="row.label">
+                    <tr v-for="row in detailRankingRows" :key="row.label">
                       <td class="item-path" :title="row.label">{{ row.label }}</td>
                       <td class="item-count">
                         <div class="bar-container">
@@ -632,10 +669,7 @@
                     </tr>
                   </template>
                   <template v-else>
-                    <tr v-if="detailLogRows.length === 0">
-                      <td :colspan="detailColumns.length">{{ t('common.noData') }}</td>
-                    </tr>
-                    <tr v-else v-for="(row, rowIndex) in detailLogRows" :key="rowIndex">
+                    <tr v-for="(row, rowIndex) in detailLogRows" :key="rowIndex">
                       <td
                         v-for="(cell, cellIndex) in row.cells"
                         :key="cellIndex"
@@ -647,7 +681,7 @@
                     </tr>
                   </template>
                 </tbody>
-                <tfoot v-if="detailMode === 'logs'">
+                <tfoot v-if="detailMode === 'logs' && detailLogRows.length > 0">
                   <tr class="detail-load-row">
                     <td :colspan="detailColumns.length">
                       <Button outlined :disabled="detailLoadMoreDisabled" @click="loadMoreDetail">
@@ -670,9 +704,7 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import * as echarts from 'echarts';
-import chinaMap from '@/assets/maps/china.json';
-import worldMap from '@/assets/maps/world.json';
+import type { EChartsType } from 'echarts/core';
 import {
   fetchBrowserStats,
   fetchDeviceStats,
@@ -711,8 +743,10 @@ type ThemeContext = {
   isDark: { value: boolean };
 };
 
-echarts.registerMap('china', chinaMap as any);
-echarts.registerMap('world', worldMap as any);
+type EChartsCore = typeof import('echarts/core');
+
+let echartsCore: EChartsCore | null = null;
+let geoMapRuntimePromise: Promise<EChartsCore> | null = null;
 
 const theme = inject<ThemeContext>('theme', null);
 const setLiveVisitorCount = inject<((value: number | null) => void) | null>('setLiveVisitorCount', null);
@@ -739,6 +773,7 @@ function toggleAutoRefresh() {
 }
 
 const overall = ref<Record<string, any> | null>(null);
+const timeSeriesData = ref<TimeSeriesStats | null>(null);
 const urlStats = ref<SimpleSeriesStats | null>(null);
 const refererStats = ref<SimpleSeriesStats | null>(null);
 const browserStats = ref<SimpleSeriesStats | null>(null);
@@ -755,7 +790,7 @@ const geoMapRef = ref<HTMLDivElement | null>(null);
 let visitsChart: Chart | null = null;
 let newOldChart: Chart | null = null;
 let deviceChart: Chart | null = null;
-let geoMapChart: echarts.ECharts | null = null;
+let geoMapChart: EChartsType | null = null;
 
 let overviewRequestId = 0;
 let chartRequestId = 0;
@@ -950,6 +985,10 @@ const refererRows = computed(() =>
 const urlRows = computed(() => buildRankingRows(urlStats.value, true));
 const entryRows = computed(() => buildRankingRows(overall.value?.entryPages, false));
 const geoRows = computed(() => buildGeoRows(geoData.value));
+const hasVisitsTrendData = computed(() => hasTimeSeriesData(timeSeriesData.value));
+const hasNewOldData = computed(() => newOldStats.value.newCount + newOldStats.value.oldCount > 0);
+const hasGeoData = computed(() => geoRows.value.length > 0);
+const hasDeviceData = computed(() => deviceTotals.value.desktop + deviceTotals.value.mobile + deviceTotals.value.other > 0);
 
 const dailyViewDisabled = computed(() => ['today', 'yesterday'].includes(dateRange.value) || isSpecificDateValue(dateRange.value));
 
@@ -1487,17 +1526,20 @@ async function loadTimeSeries() {
 
   const requestId = ++chartRequestId;
   chartError.value = '';
+  timeSeriesData.value = null;
 
   try {
     const data = await fetchTimeSeriesStats(currentWebsiteId.value, dateRange.value, chartView.value);
     if (requestId !== chartRequestId) {
       return;
     }
+    timeSeriesData.value = data;
     renderVisitsChart(data);
   } catch (error: any) {
     if (error?.name === 'AbortError') {
       return;
     }
+    timeSeriesData.value = null;
     chartError.value = t('overview.trendError');
   }
 }
@@ -1546,16 +1588,66 @@ async function loadGeoMap() {
   }
 }
 
-function initGeoMap() {
-  if (!geoMapRef.value) {
+async function ensureGeoMapRuntime() {
+  if (echartsCore) {
+    return echartsCore;
+  }
+  if (!geoMapRuntimePromise) {
+    geoMapRuntimePromise = Promise.all([
+      import('echarts/core'),
+      import('echarts/charts'),
+      import('echarts/components'),
+      import('echarts/renderers'),
+      import('@/assets/maps/china.json'),
+      import('@/assets/maps/world.json'),
+    ])
+      .then(([core, charts, components, renderers, chinaMap, worldMap]) => {
+        core.use([
+          charts.MapChart,
+          components.GeoComponent,
+          components.TooltipComponent,
+          components.VisualMapComponent,
+          renderers.CanvasRenderer,
+        ]);
+        core.registerMap('china', chinaMap.default as any);
+        core.registerMap('world', worldMap.default as any);
+        echartsCore = core;
+        return core;
+      })
+      .catch((error) => {
+        geoMapRuntimePromise = null;
+        throw error;
+      });
+  }
+  return geoMapRuntimePromise;
+}
+
+async function initGeoMap() {
+  if (!geoMapRef.value || geoMapChart) {
     return;
   }
-  geoMapChart = echarts.init(geoMapRef.value);
+  try {
+    const echarts = await ensureGeoMapRuntime();
+    if (!geoMapRef.value || geoMapChart) {
+      return;
+    }
+    geoMapChart = echarts.init(geoMapRef.value);
+  } catch (error) {
+    console.error('初始化地域地图失败:', error);
+    return;
+  }
   renderGeoMap(geoData.value);
+  if (currentWebsiteId.value && geoData.value.length === 0) {
+    loadGeoMap();
+  }
 }
 
 function renderGeoMap(data: Array<{ name: string; value: number; percentage: number }>) {
-  if (!geoMapChart || !data || data.length === 0) {
+  if (!geoMapChart) {
+    return;
+  }
+  if (!data || data.length === 0) {
+    geoMapChart.clear();
     return;
   }
 
@@ -1691,7 +1783,11 @@ function getMetricValue(metric: 'pv' | 'uv' | 'session', source: MetricSnapshot)
 }
 
 function renderVisitsChart(stats: TimeSeriesStats) {
-  if (!visitsChartRef.value) {
+  if (visitsChart) {
+    visitsChart.destroy();
+    visitsChart = null;
+  }
+  if (!visitsChartRef.value || !hasTimeSeriesData(stats)) {
     return;
   }
 
@@ -1788,15 +1884,15 @@ function renderVisitsChart(stats: TimeSeriesStats) {
     },
   }
 
-  if (visitsChart) {
-    visitsChart.destroy();
-  }
-
   visitsChart = new Chart(ctx, chartConfig as any);
 }
 
 function renderNewOldChart(stats: typeof newOldStats.value) {
-  if (!newOldChartRef.value) {
+  if (newOldChart) {
+    newOldChart.destroy();
+    newOldChart = null;
+  }
+  if (!newOldChartRef.value || stats.newCount + stats.oldCount <= 0) {
     return;
   }
 
@@ -1810,67 +1906,63 @@ function renderNewOldChart(stats: typeof newOldStats.value) {
   const previousNew = stats.prevNew;
   const previousOld = stats.prevOld;
 
-  if (!newOldChart) {
-    newOldChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: stats.labels,
-        datasets: [
-          {
-            label: t('overview.newVisitor'),
-            data: [currentNew, previousNew],
-            backgroundColor: 'rgba(30, 123, 255, 0.7)',
-            borderRadius: 10,
-            barThickness: 28,
-          },
-          {
-            label: t('overview.oldVisitor'),
-            data: [currentOld, previousOld],
-            backgroundColor: 'rgba(255, 138, 61, 0.7)',
-            borderRadius: 10,
-            barThickness: 28,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'top' as const,
-            align: 'end' as const,
-            labels: {
-              usePointStyle: true,
-              boxWidth: 8,
-            },
-          },
+  newOldChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: stats.labels,
+      datasets: [
+        {
+          label: t('overview.newVisitor'),
+          data: [currentNew, previousNew],
+          backgroundColor: 'rgba(30, 123, 255, 0.7)',
+          borderRadius: 10,
+          barThickness: 28,
         },
-        scales: {
-          x: {
-            grid: {
-              display: false,
-            },
-          },
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: 'rgba(148, 163, 184, 0.25)',
-            },
+        {
+          label: t('overview.oldVisitor'),
+          data: [currentOld, previousOld],
+          backgroundColor: 'rgba(255, 138, 61, 0.7)',
+          borderRadius: 10,
+          barThickness: 28,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top' as const,
+          align: 'end' as const,
+          labels: {
+            usePointStyle: true,
+            boxWidth: 8,
           },
         },
       },
-    });
-    return;
-  }
-
-  newOldChart.data.labels = stats.labels;
-  newOldChart.data.datasets[0].data = [currentNew, previousNew];
-  newOldChart.data.datasets[1].data = [currentOld, previousOld];
-  newOldChart.update();
+      scales: {
+        x: {
+          grid: {
+            display: false,
+          },
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(148, 163, 184, 0.25)',
+          },
+        },
+      },
+    },
+  });
 }
 
 function renderDeviceChart(totals: typeof deviceTotals.value) {
-  if (!deviceChartRef.value) {
+  if (deviceChart) {
+    deviceChart.destroy();
+    deviceChart = null;
+  }
+  if (!deviceChartRef.value || totals.desktop + totals.mobile + totals.other <= 0) {
     return;
   }
 
@@ -1881,39 +1973,42 @@ function renderDeviceChart(totals: typeof deviceTotals.value) {
 
   const data = [totals.desktop, totals.mobile, totals.other];
 
-  if (!deviceChart) {
-    deviceChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: [t('overview.deviceDesktop'), t('overview.deviceMobile'), t('overview.deviceOther')],
-        datasets: [
-          {
-            data,
-            backgroundColor: ['#1e7bff', '#ff8a3d', '#2ec27e'],
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '68%',
-        plugins: {
-          legend: {
-            position: 'bottom' as const,
-            labels: {
-              usePointStyle: true,
-              boxWidth: 8,
-            },
+  deviceChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: [t('overview.deviceDesktop'), t('overview.deviceMobile'), t('overview.deviceOther')],
+      datasets: [
+        {
+          data,
+          backgroundColor: ['#1e7bff', '#ff8a3d', '#2ec27e'],
+          borderWidth: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: {
+        legend: {
+          position: 'bottom' as const,
+          labels: {
+            usePointStyle: true,
+            boxWidth: 8,
           },
         },
       },
-    });
-    return;
-  }
+    },
+  });
+}
 
-  deviceChart.data.datasets[0].data = data;
-  deviceChart.update();
+function hasTimeSeriesData(stats: TimeSeriesStats | null) {
+  if (!stats || !Array.isArray(stats.labels) || stats.labels.length === 0) {
+    return false;
+  }
+  return [stats.visitors || [], stats.pageviews || []].some((series) =>
+    Array.isArray(series) && series.some((value) => Number(value || 0) > 0)
+  );
 }
 
 async function openDetail(type: string) {
@@ -2169,8 +2264,9 @@ async function loadDetailLogs(reset: boolean, requestId: number) {
       : null;
     const logs = result.logs || [];
     updateLogRows(logs, reset, scope);
+    const exact = result.pagination?.exact !== false;
     const pages = result.pagination?.pages || 1;
-    detailHasMore.value = detailPage.value < pages;
+    detailHasMore.value = exact ? detailPage.value < pages : Boolean(result.pagination?.hasMore);
     detailLoadState.value = detailHasMore.value ? 'ready' : 'done';
   } catch (error) {
     console.error('加载日志详情失败:', error);
@@ -3064,5 +3160,200 @@ function isExcludedGeoName(name: string) {
   background-color: #f8d7da;
   border: 1px solid #f5c6cb;
   border-radius: var(--radius-2xs);
+}
+
+.overview-empty-state {
+  width: 100%;
+  min-height: 180px;
+  box-sizing: border-box;
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(var(--primary-color-rgb), 0.16);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.06), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 255, 0.84));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 24px;
+  text-align: center;
+}
+
+.overview-empty-state-compact {
+  min-height: 112px;
+  padding: 14px 18px;
+  gap: 6px;
+}
+
+.geo-empty-state {
+  min-height: 260px;
+  border-color: rgba(var(--primary-color-rgb), 0.12);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.04), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 255, 0.8));
+}
+
+.overview-empty-state-table {
+  min-height: 180px;
+}
+
+.detail-empty-state {
+  min-height: 260px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(var(--primary-color-rgb), 0.16);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.06), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 255, 0.84));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.detail-empty-state-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--primary);
+  background: rgba(var(--primary-color-rgb), 0.1);
+}
+
+.detail-empty-state-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.detail-empty-state-text {
+  max-width: 320px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.overview-empty-state-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--primary);
+  background: rgba(var(--primary-color-rgb), 0.1);
+}
+
+.overview-empty-state-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.overview-empty-state-text {
+  max-width: 320px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.chart-wrap .overview-empty-state {
+  min-height: 232px;
+  padding-inline: 28px;
+}
+
+.chart-mini .overview-empty-state {
+  min-height: 136px;
+}
+
+.chart-mini .overview-empty-state-icon,
+.device-chart .overview-empty-state-icon {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+}
+
+.chart-mini .overview-empty-state-title,
+.device-chart .overview-empty-state-title {
+  font-size: 12px;
+}
+
+.chart-mini .overview-empty-state-text,
+.device-chart .overview-empty-state-text {
+  max-width: 240px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.device-chart .overview-empty-state {
+  min-height: 136px;
+}
+
+.geo-empty-state .overview-empty-state-icon {
+  width: 42px;
+  height: 42px;
+  font-size: 20px;
+  background: rgba(var(--primary-color-rgb), 0.08);
+}
+
+.geo-empty-state .overview-empty-state-text {
+  max-width: 360px;
+}
+
+:global(body.dark-mode) .overview-empty-state {
+  border-color: rgba(148, 163, 184, 0.26);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.12), transparent 56%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.56));
+  color: var(--text);
+}
+
+:global(body.dark-mode) .overview-empty-state-icon {
+  color: #8bb8ff;
+  background: rgba(var(--primary-color-rgb), 0.16);
+}
+
+:global(body.dark-mode) .overview-empty-state-title {
+  color: rgba(241, 245, 249, 0.94);
+}
+
+:global(body.dark-mode) .overview-empty-state-text {
+  color: rgba(148, 163, 184, 0.92);
+}
+
+:global(body.dark-mode) .geo-empty-state {
+  border-color: rgba(148, 163, 184, 0.18);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.08), transparent 62%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.62), rgba(15, 23, 42, 0.5));
+}
+
+:global(body.dark-mode) .detail-empty-state {
+  border-color: rgba(148, 163, 184, 0.26);
+  background:
+    radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.12), transparent 56%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.56));
+  color: var(--text);
+}
+
+:global(body.dark-mode) .detail-empty-state-icon {
+  color: #8bb8ff;
+  background: rgba(var(--primary-color-rgb), 0.16);
+}
+
+:global(body.dark-mode) .detail-empty-state-title {
+  color: rgba(241, 245, 249, 0.94);
+}
+
+:global(body.dark-mode) .detail-empty-state-text {
+  color: rgba(148, 163, 184, 0.92);
 }
 </style>

@@ -357,9 +357,13 @@ func SetupRoutes(
 	})
 
 	router.GET("/api/version", func(c *gin.Context) {
+		updateInfo := version.GetUpdateInfo()
 		c.JSON(http.StatusOK, gin.H{
-			"version":    version.Version,
-			"git_commit": version.GitCommit,
+			"version":            version.Version,
+			"git_commit":         version.GitCommit,
+			"update_available":   updateInfo.UpdateAvailable,
+			"latest_version":     updateInfo.LatestVersion,
+			"latest_release_url": updateInfo.LatestReleaseURL,
 		})
 	})
 

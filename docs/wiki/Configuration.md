@@ -314,6 +314,8 @@ log_format nginxpulse_trace '$remote_addr - $remote_user [$time_local] '
 #### agent 源示例
 字段要点：用于接入 Agent 流式采集（当前版本不参与定期扫描）。
 > 说明：这里的 Agent 是日志采集进程，不是 AI 大模型 Agent。
+
+`id` 需要和 Agent 配置里的 `sourceID` 一致。这个 source 只用于给 Agent 推送的数据匹配解析覆盖规则；Agent 的安装、部署和 `/api/ingest/logs` 推送配置见[日志解析机制](Log-Parsing)里的 Push Agent 章节。
 ```json
 {
   "id": "agent-main",

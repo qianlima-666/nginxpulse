@@ -30,6 +30,7 @@ type NginxLogRecord struct {
 	UpstreamAddr     string    `json:"upstream_addr"`
 	Host             string    `json:"host"`
 	RequestID        string    `json:"request_id"`
+	Fingerprint      string    `json:"fingerprint,omitempty"`
 	Referer          string    `json:"referer"`
 	UserBrowser      string    `json:"user_browser"`
 	UserOs           string    `json:"user_os"`
@@ -109,6 +110,7 @@ func sanitizeLogRecord(log NginxLogRecord) NginxLogRecord {
 	log.UpstreamAddr = sanitizeAndTruncate(log.UpstreamAddr, maxUpstreamAddr)
 	log.Host = sanitizeAndTruncate(log.Host, maxHostBytes)
 	log.RequestID = sanitizeAndTruncate(log.RequestID, maxRequestID)
+	log.Fingerprint = sanitizeUTF8(log.Fingerprint)
 	log.Referer = sanitizeAndTruncate(log.Referer, maxRefererBytes)
 	log.UserBrowser = sanitizeAndTruncate(log.UserBrowser, maxUABytes)
 	log.UserOs = sanitizeAndTruncate(log.UserOs, maxUABytes)

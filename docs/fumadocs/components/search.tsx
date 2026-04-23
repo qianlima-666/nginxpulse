@@ -12,13 +12,15 @@ import {
 } from 'fumadocs-ui/components/dialog/search';
 import { useDocsSearch } from 'fumadocs-core/search/client';
 import { create } from '@orama/orama';
+import { createTokenizer } from '@orama/tokenizers/mandarin';
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
 
-function initOrama() {
+async function initOrama() {
   return create({
     schema: { _: 'string' },
-    // https://docs.orama.com/docs/orama-js/supported-languages
-    language: 'english',
+    components: {
+      tokenizer: await createTokenizer(),
+    },
   });
 }
 

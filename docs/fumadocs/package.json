@@ -14,6 +14,7 @@
     "@fontsource/noto-sans-sc": "^5.2.9",
     "@fontsource/sora": "^5.2.8",
     "@orama/orama": "^3.1.18",
+    "@orama/tokenizers": "^3.1.18",
     "@takumi-rs/image-response": "^0.68.17",
     "fumadocs-core": "16.6.5",
     "fumadocs-mdx": "14.2.8",

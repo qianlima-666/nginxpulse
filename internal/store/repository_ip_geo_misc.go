@@ -405,6 +405,7 @@ func (r *Repository) batchInsertLogsForWebsiteOnce(websiteID string, logs []Ngin
 	// 将 first_seen 的写入从“每条日志一次 upsert”改为“本批次去重后按 ip_id 顺序写入”，降低死锁概率与锁竞争。
 	firstSeenMinTs := make(map[int64]int64)
 	logRows := make([]logInsertRow, 0, len(logs))
+	sanitizedLogs := make([]NginxLogRecord, 0, len(logs))
 
 	// 执行批量插入
 	for _, log := range logs {
@@ -464,14 +465,32 @@ func (r *Repository) batchInsertLogsForWebsiteOnce(websiteID string, logs []Ngin
 			upstreamAddr:   log.UpstreamAddr,
 			host:           log.Host,
 			requestID:      log.RequestID,
+			fingerprint:    log.Fingerprint,
 			refererID:      refererID,
 			uaID:           uaID,
 			locationID:     locationID,
 		})
+		sanitizedLogs = append(sanitizedLogs, log)
+	}
+
+	insertedCounts, err := bulkInsertLogRows(tx, logTable, logRows)
+	if err != nil {
+		return err
+	}
+
+	for i, row := range logRows {
+		log := sanitizedLogs[i]
+		if row.fingerprint != "" {
+			key := logInsertConflictKey(row.timestamp, row.fingerprint)
+			if insertedCounts[key] <= 0 {
+				continue
+			}
+			insertedCounts[key]--
+		}
 
 		if log.PageviewFlag == 1 {
-			if prev, ok := firstSeenMinTs[ipID]; !ok || ts < prev {
-				firstSeenMinTs[ipID] = ts
+			if prev, ok := firstSeenMinTs[row.ipID]; !ok || row.timestamp < prev {
+				firstSeenMinTs[row.ipID] = row.timestamp
 			}
 			if err := updateSessionFromLog(
 				sessions,
@@ -481,21 +500,17 @@ func (r *Repository) batchInsertLogsForWebsiteOnce(websiteID string, logs []Ngin
 				sessionUpdates,
 				sessionStateUpserts,
 				lockedSessionKeys,
-				ipID,
-				uaID,
-				locationID,
-				urlID,
-				ts,
+				row.ipID,
+				row.uaID,
+				row.locationID,
+				row.urlID,
+				row.timestamp,
 			); err != nil {
 				return err
 			}
 		}
 
-		aggBatch.add(log, ipID)
-	}
-
-	if err := bulkInsertLogRows(tx, logTable, logRows); err != nil {
-		return err
+		aggBatch.add(log, row.ipID)
 	}
 
 	// 统一顺序写入 first_seen：按 ip_id 升序，避免不同事务对同一批 key 的锁顺序不一致。
@@ -720,9 +735,10 @@ func (r *Repository) ensureIPGeoAPIFailureTable() error {
             error TEXT NOT NULL DEFAULT '',
             status_code INT NOT NULL DEFAULT 0,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )`,
+		)`,
 		`CREATE INDEX IF NOT EXISTS idx_ip_geo_api_failures_created_at ON "ip_geo_api_failures"(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_ip_geo_api_failures_ip ON "ip_geo_api_failures"(ip)`,
+		`CREATE INDEX IF NOT EXISTS idx_ip_geo_api_failures_ip_created_at ON "ip_geo_api_failures"(ip, created_at)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := r.db.Exec(stmt); err != nil {
@@ -746,10 +762,11 @@ func (r *Repository) ensureSystemNotificationTable() error {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             last_occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             read_at TIMESTAMPTZ
-        )`,
+		)`,
 		`CREATE INDEX IF NOT EXISTS idx_system_notifications_created_at ON "system_notifications"(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_system_notifications_last_occurred ON "system_notifications"(last_occurred_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_system_notifications_read_at ON "system_notifications"(read_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_system_notifications_unread_last_occurred ON "system_notifications"(last_occurred_at DESC) WHERE read_at IS NULL`,
 	}
 	for _, stmt := range stmts {
 		if _, err := r.db.Exec(stmt); err != nil {

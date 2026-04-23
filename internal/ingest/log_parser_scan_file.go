@@ -17,6 +17,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type parseSourceContext struct {
+	sourceID    string
+	sourceKey   string
+	startOffset int64
+	hasOffset   bool
+}
+
 func (p *LogParser) scanSingleFile(
 	websiteID string, logPath string, parserResult *ParserResult) {
 	file, err := os.Open(logPath)
@@ -64,8 +71,9 @@ func (p *LogParser) scanSingleFile(
 			if fileInfo.ModTime().After(cutoff) || fileInfo.ModTime().Equal(cutoff) {
 				if _, err := file.Seek(0, 0); err == nil {
 					if gzReader, err := gzip.NewReader(file); err == nil {
+						sourceCtx := fileParseSourceContext(logPath, 0)
 						entriesCount, _, minTs, maxTs := p.parseLogLines(
-							gzReader, websiteID, "", parserResult, parseWindow{minTs: cutoffTs},
+							gzReader, websiteID, sourceCtx, parserResult, parseWindow{minTs: cutoffTs},
 						)
 						gzReader.Close()
 						p.updateParsedRange(&fileState, minTs, maxTs)
@@ -118,8 +126,9 @@ func (p *LogParser) scanSingleFile(
 				logrus.Errorf("无法设置文件读取位置 %s: %v", logPath, err)
 				p.notifyFileIO(websiteID, logPath, "设置文件读取位置", err)
 			} else {
+				sourceCtx := fileParseSourceContext(logPath, recentOffset)
 				entriesCount, _, minTs, maxTs := p.parseLogLines(
-					file, websiteID, "", parserResult, parseWindow{minTs: cutoffTs},
+					file, websiteID, sourceCtx, parserResult, parseWindow{minTs: cutoffTs},
 				)
 				p.updateParsedRange(&fileState, minTs, maxTs)
 				if maxTs > fileState.LastTimestamp {
@@ -189,7 +198,8 @@ func (p *LogParser) scanSingleFile(
 		reader = file
 	}
 
-	entriesCount, bytesRead, minTs, maxTs := p.parseLogLines(reader, websiteID, "", parserResult, parseWindow{})
+	sourceCtx := fileParseSourceContext(logPath, startOffset)
+	entriesCount, bytesRead, minTs, maxTs := p.parseLogLines(reader, websiteID, sourceCtx, parserResult, parseWindow{})
 	if closer != nil {
 		closer.Close()
 	}
@@ -417,7 +427,7 @@ func (p *LogParser) findRecentOffset(
 
 // parseLogLines 解析日志行并返回解析的记录数
 func (p *LogParser) parseLogLines(
-	reader io.Reader, websiteID, sourceID string, parserResult *ParserResult, window parseWindow) (int, int64, int64, int64) {
+	reader io.Reader, websiteID string, sourceCtx parseSourceContext, parserResult *ParserResult, window parseWindow) (int, int64, int64, int64) {
 	scanner := bufio.NewScanner(reader)
 	entriesCount := 0
 	var minTs int64
@@ -425,6 +435,7 @@ func (p *LogParser) parseLogLines(
 	parsedBuckets := make(map[int64]struct{})
 	var whitelistHits map[string]*whitelistHit
 	var batchWhitelistHits map[string]*whitelistHit
+	domainMatcher := newWebsiteDomainMatcher(websiteID)
 
 	// 批量插入相关
 	batch := make([]store.NginxLogRecord, 0, p.parseBatchSize)
@@ -457,6 +468,7 @@ func (p *LogParser) parseLogLines(
 	for scanner.Scan() {
 		line := scanner.Text()
 		lineBytes := int64(len(line) + 1)
+		lineOffset := sourceCtx.startOffset + totalBytes
 		pendingBytes += lineBytes
 		totalBytes += lineBytes
 		if pendingBytes >= progressChunk {
@@ -464,10 +476,14 @@ func (p *LogParser) parseLogLines(
 			pendingBytes = 0
 		}
 
-		entry, err := p.parseLogLine(websiteID, sourceID, line)
+		entry, err := p.parseLogLine(websiteID, sourceCtx.sourceID, line)
 		if err != nil {
 			continue
 		}
+		if !domainMatcher.includesHost(entry.Host) {
+			continue
+		}
+		entry.Fingerprint = buildLogLineFingerprint(sourceCtx, lineOffset, line)
 		ts := entry.Timestamp.Unix()
 		if !window.allows(ts) {
 			continue
@@ -529,6 +545,7 @@ func (p *LogParser) IngestLines(websiteID, sourceID string, lines []string) (int
 	parsedBuckets := make(map[int64]struct{})
 	var whitelistHits map[string]*whitelistHit
 	var batchWhitelistHits map[string]*whitelistHit
+	domainMatcher := newWebsiteDomainMatcher(websiteID)
 
 	processBatch := func() error {
 		if len(batch) == 0 {
@@ -552,6 +569,10 @@ func (p *LogParser) IngestLines(websiteID, sourceID string, lines []string) (int
 		if err != nil {
 			continue
 		}
+		if !domainMatcher.includesHost(entry.Host) {
+			continue
+		}
+		entry.Fingerprint = streamLogLineFingerprint(sourceID, line)
 		key := buildDedupKey(websiteID, sourceID, line)
 		if p.dedup != nil && p.dedup.Seen(key) {
 			deduped++
@@ -609,6 +630,36 @@ func buildDedupKey(websiteID, sourceID, line string) string {
 		return fmt.Sprintf("%s:%x", websiteID, hash[:])
 	}
 	return fmt.Sprintf("%s:%s:%x", websiteID, sourceID, hash[:])
+}
+
+func fileParseSourceContext(logPath string, startOffset int64) parseSourceContext {
+	return parseSourceContext{
+		sourceKey:   normalizeLogPath(logPath),
+		startOffset: startOffset,
+		hasOffset:   true,
+	}
+}
+
+func targetParseSourceContext(sourceID, targetKey string, startOffset int64) parseSourceContext {
+	return parseSourceContext{
+		sourceID:    sourceID,
+		sourceKey:   buildTargetStateKey(sourceID, targetKey),
+		startOffset: startOffset,
+		hasOffset:   true,
+	}
+}
+
+func streamLogLineFingerprint(sourceID, line string) string {
+	hash := sha1.Sum([]byte("stream:v1\x00" + sourceID + "\x00" + line))
+	return fmt.Sprintf("%x", hash[:])
+}
+
+func buildLogLineFingerprint(sourceCtx parseSourceContext, lineOffset int64, line string) string {
+	if sourceCtx.hasOffset {
+		hash := sha1.Sum([]byte(fmt.Sprintf("offset:v1\x00%s\x00%d\x00%s", sourceCtx.sourceKey, lineOffset, line)))
+		return fmt.Sprintf("%x", hash[:])
+	}
+	return streamLogLineFingerprint(sourceCtx.sourceID, line)
 }
 
 // markBatchIPGeoPending mutates the batch in-place to mark locations as "待解析"/"未知".

@@ -101,6 +101,7 @@ type logInsertRow struct {
 	upstreamAddr   string
 	host           string
 	requestID      string
+	fingerprint    string
 	refererID      int64
 	uaID           int64
 	locationID     int64
@@ -779,13 +780,14 @@ func applyAggUpdates(aggs *aggStatements, batch *aggBatch) error {
 	*/
 }
 
-func bulkInsertLogRows(tx *sql.Tx, logTable string, rows []logInsertRow) error {
+func bulkInsertLogRows(tx *sql.Tx, logTable string, rows []logInsertRow) (map[string]int, error) {
+	inserted := make(map[string]int)
 	if len(rows) == 0 {
-		return nil
+		return inserted, nil
 	}
 
 	const (
-		columnCount = 16
+		columnCount = 17
 		// PostgreSQL 参数上限是 65535，预留余量避免触边界。
 		maxParams = 60000
 	)
@@ -799,16 +801,21 @@ func bulkInsertLogRows(tx *sql.Tx, logTable string, rows []logInsertRow) error {
 		if end > len(rows) {
 			end = len(rows)
 		}
-		if err := bulkInsertLogRowsChunk(tx, logTable, rows[start:end]); err != nil {
-			return err
+		chunkInserted, err := bulkInsertLogRowsChunk(tx, logTable, rows[start:end])
+		if err != nil {
+			return nil, err
+		}
+		for key, count := range chunkInserted {
+			inserted[key] += count
 		}
 	}
-	return nil
+	return inserted, nil
 }
 
-func bulkInsertLogRowsChunk(tx *sql.Tx, logTable string, rows []logInsertRow) error {
+func bulkInsertLogRowsChunk(tx *sql.Tx, logTable string, rows []logInsertRow) (map[string]int, error) {
+	inserted := make(map[string]int)
 	if len(rows) == 0 {
-		return nil
+		return inserted, nil
 	}
 
 	var query strings.Builder
@@ -816,17 +823,21 @@ func bulkInsertLogRowsChunk(tx *sql.Tx, logTable string, rows []logInsertRow) er
 	query.WriteString(`INSERT INTO "`)
 	query.WriteString(logTable)
 	query.WriteString(`" (
-        ip_id, pageview_flag, timestamp, method, url_id,
-        status_code, bytes_sent, request_length, request_time_ms, upstream_response_time_ms,
-        upstream_addr, host, request_id, referer_id, ua_id, location_id
-    ) VALUES `)
+	        ip_id, pageview_flag, timestamp, method, url_id,
+	        status_code, bytes_sent, request_length, request_time_ms, upstream_response_time_ms,
+	        upstream_addr, host, request_id, fingerprint, referer_id, ua_id, location_id
+	    ) VALUES `)
 
-	args := make([]interface{}, 0, len(rows)*16)
+	args := make([]interface{}, 0, len(rows)*17)
 	for i, row := range rows {
 		if i > 0 {
 			query.WriteString(",")
 		}
-		query.WriteString("(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+		query.WriteString("(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+		var fingerprint any
+		if strings.TrimSpace(row.fingerprint) != "" {
+			fingerprint = row.fingerprint
+		}
 		args = append(
 			args,
 			row.ipID,
@@ -842,12 +853,35 @@ func bulkInsertLogRowsChunk(tx *sql.Tx, logTable string, rows []logInsertRow) er
 			row.upstreamAddr,
 			row.host,
 			row.requestID,
+			fingerprint,
 			row.refererID,
 			row.uaID,
 			row.locationID,
 		)
 	}
+	query.WriteString(` ON CONFLICT DO NOTHING RETURNING timestamp, fingerprint`)
 
-	_, err := tx.Exec(sqlutil.ReplacePlaceholders(query.String()), args...)
-	return err
+	resultRows, err := tx.Query(sqlutil.ReplacePlaceholders(query.String()), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer resultRows.Close()
+	for resultRows.Next() {
+		var timestamp int64
+		var fingerprint sql.NullString
+		if err := resultRows.Scan(&timestamp, &fingerprint); err != nil {
+			return nil, err
+		}
+		if fingerprint.Valid && fingerprint.String != "" {
+			inserted[logInsertConflictKey(timestamp, fingerprint.String)]++
+		}
+	}
+	if err := resultRows.Err(); err != nil {
+		return nil, err
+	}
+	return inserted, nil
+}
+
+func logInsertConflictKey(timestamp int64, fingerprint string) string {
+	return fmt.Sprintf("%d\x1f%s", timestamp, fingerprint)
 }

@@ -31,8 +31,8 @@
     --card-radius: var(--radius-lg);
     --input-bg: #f1f4f9;
     --row-alt-bg: #eef2f8;
-    --font-sans: "Sora", "Noto Sans SC", sans-serif;
-    --font-display: "Sora", "Noto Sans SC", sans-serif;
+    --font-sans: "Sora", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-display: "Sora", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --primary-color: var(--primary);
     --primary-color-dark: var(--primary-strong);
     --primary-color-rgb: 29, 107, 255;
@@ -119,6 +119,157 @@ body.dark-mode::before {
     opacity: 0.55;
 }
 
+body.dark-mode .overview-empty-state,
+body.dark-mode .detail-empty-state,
+body.dark-mode .daily-empty-state,
+body.dark-mode .realtime-empty-state {
+    border-color: rgba(148, 163, 184, 0.24);
+    background:
+        radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.12), transparent 56%),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.56));
+    color: var(--text);
+}
+
+body.dark-mode .geo-empty-state {
+    border-color: rgba(148, 163, 184, 0.18);
+    background:
+        radial-gradient(circle at top, rgba(var(--primary-color-rgb), 0.08), transparent 62%),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.62), rgba(15, 23, 42, 0.5));
+}
+
+body.dark-mode .overview-empty-state-title,
+body.dark-mode .detail-empty-state-title,
+body.dark-mode .daily-empty-state-title,
+body.dark-mode .realtime-empty-state-title,
+body.dark-mode .logs-empty-state-title {
+    color: rgba(241, 245, 249, 0.94);
+}
+
+body.dark-mode .overview-empty-state-text,
+body.dark-mode .detail-empty-state-text,
+body.dark-mode .daily-empty-state-text,
+body.dark-mode .realtime-empty-state-text,
+body.dark-mode .logs-empty-state-text {
+    color: rgba(148, 163, 184, 0.92);
+}
+
+body.dark-mode .overview-empty-state-icon,
+body.dark-mode .detail-empty-state-icon,
+body.dark-mode .daily-empty-state-icon,
+body.dark-mode .realtime-empty-state-icon,
+body.dark-mode .logs-empty-state-icon {
+    color: #8bb8ff;
+    background: rgba(var(--primary-color-rgb), 0.16);
+}
+
+body.dark-mode .logs-empty-overlay::before {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.72));
+}
+
+body.dark-mode .daily-dev-section {
+    background:
+        radial-gradient(circle at top right, rgba(239, 68, 68, 0.14), transparent 28%),
+        radial-gradient(circle at bottom left, rgba(var(--primary-color-rgb), 0.14), transparent 34%),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.9));
+}
+
+body.dark-mode .daily-dev-pill {
+    border-color: rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.52);
+    color: rgba(241, 245, 249, 0.92);
+}
+
+body.dark-mode .daily-dev-pill-label,
+body.dark-mode .daily-dev-subtitle,
+body.dark-mode .daily-dev-card-subtitle,
+body.dark-mode .daily-dev-card-meta,
+body.dark-mode .daily-dev-card-detail,
+body.dark-mode .daily-dev-block-sub,
+body.dark-mode .daily-summary-strip,
+body.dark-mode .daily-dev-url-meta,
+body.dark-mode .daily-dev-cell-hint,
+body.dark-mode .daily-dev-cell-cta {
+    color: rgba(148, 163, 184, 0.88);
+}
+
+body.dark-mode .daily-dev-card,
+body.dark-mode .daily-dev-digest,
+body.dark-mode .daily-dev-chart-card,
+body.dark-mode .daily-dev-table-card {
+    border-color: rgba(148, 163, 184, 0.16);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.72));
+    box-shadow: 0 10px 20px rgba(2, 6, 23, 0.24);
+}
+
+body.dark-mode .daily-dev-card::after {
+    background: rgba(var(--primary-color-rgb), 0.08);
+}
+
+body.dark-mode .daily-dev-card-title,
+body.dark-mode .daily-dev-card-value,
+body.dark-mode .daily-dev-block-title,
+body.dark-mode .daily-dev-digest-title,
+body.dark-mode .daily-dev-status-text,
+body.dark-mode .daily-dev-url,
+body.dark-mode .daily-dev-cell-link,
+body.dark-mode .daily-dev-table-card .ranking-table td {
+    color: rgba(241, 245, 249, 0.94);
+}
+
+body.dark-mode .daily-dev-table-card .ranking-table th {
+    color: rgba(148, 163, 184, 0.8);
+}
+
+body.dark-mode .daily-dev-status-strip {
+    border-color: rgba(148, 163, 184, 0.18);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.68));
+}
+
+body.dark-mode .daily-dev-status-strip.stable {
+    border-color: rgba(34, 197, 94, 0.16);
+    background: linear-gradient(180deg, rgba(20, 83, 45, 0.24), rgba(15, 23, 42, 0.68));
+}
+
+body.dark-mode .daily-dev-status-title,
+body.dark-mode .daily-dev-status-meta {
+    color: rgba(148, 163, 184, 0.9);
+}
+
+body.dark-mode .daily-dev-status-meta.stable {
+    color: #86efac;
+}
+
+body.dark-mode .p-datepicker-panel .p-datepicker-day,
+body.dark-mode .p-datepicker-panel .p-datepicker-month,
+body.dark-mode .p-datepicker-panel .p-datepicker-year {
+    color: var(--text);
+}
+
+body.dark-mode .p-datepicker-panel .p-datepicker-day-selected,
+body.dark-mode .p-datepicker-panel .p-datepicker-month-selected,
+body.dark-mode .p-datepicker-panel .p-datepicker-year-selected {
+    background: linear-gradient(180deg, var(--primary), var(--primary-strong));
+    color: #f8fbff;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+body.dark-mode .p-datepicker-panel .p-datepicker-day-selected-range {
+    background: color-mix(in srgb, var(--primary) 28%, var(--panel) 72%);
+    color: var(--text);
+}
+
+body.dark-mode .p-datepicker-panel .p-datepicker-day:not(.p-disabled):hover,
+body.dark-mode .p-datepicker-panel .p-datepicker-month:not(.p-disabled):hover,
+body.dark-mode .p-datepicker-panel .p-datepicker-year:not(.p-disabled):hover {
+    background: color-mix(in srgb, var(--primary) 18%, var(--panel) 82%);
+    color: var(--text);
+}
+
+body.dark-mode .p-datepicker-panel .p-datepicker-today > .p-datepicker-day,
+body.dark-mode .p-datepicker-panel .p-datepicker-today > .p-datepicker-day-selected-range {
+    box-shadow: inset 0 0 0 1px rgba(var(--primary-color-rgb), 0.42);
+}
+
 a {
     color: inherit;
     text-decoration: none;
@@ -154,6 +305,26 @@ body.dark-mode .sidebar {
     display: flex;
     align-items: center;
     gap: 12px;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    width: fit-content;
+    border-radius: var(--radius-sm);
+    transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.brand:hover,
+.brand:focus-visible {
+    opacity: 0.9;
+}
+
+.brand:active {
+    transform: scale(0.98);
+}
+
+.brand:focus-visible {
+    outline: 2px solid rgba(var(--primary-color-rgb), 0.35);
+    outline-offset: 4px;
 }
 
 .brand-mark {

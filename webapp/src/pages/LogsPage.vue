@@ -237,7 +237,7 @@
           columnResizeMode="fit"
           :rowHover="true"
           :stripedRows="true"
-          :emptyMessage="t('logs.empty')"
+          :emptyMessage="''"
           :tableStyle="{ minWidth: '1460px' }"
           @row-click="openLogDetail"
         >
@@ -309,6 +309,21 @@
             </template>
           </Column>
         </DataTable>
+        <div v-if="showLogsEmptyOverlay" class="logs-empty-overlay">
+          <div class="logs-empty-state logs-empty-state-overlay">
+            <span class="logs-empty-state-icon"><i class="ri-file-search-line"></i></span>
+            <div class="logs-empty-state-title">{{ logsEmptyTitle }}</div>
+            <div class="logs-empty-state-text">{{ logsEmptyText }}</div>
+            <Button
+              v-if="hasActiveLogFilters"
+              class="logs-empty-action"
+              outlined
+              severity="secondary"
+              :label="t('logs.clearFiltersAction')"
+              @click="clearLogFilters"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -498,9 +513,15 @@
         </Button>
         <div class="pagination-center">
           <div class="page-info">
-            <span>{{ t('logs.pageInfo', { current: currentPage, total: totalPages }) }}</span>
+            <span>
+              {{
+                paginationExact
+                  ? t('logs.pageInfo', { current: currentPage, total: totalPages })
+                  : t('logs.pageInfoSimple', { current: currentPage })
+              }}
+            </span>
           </div>
-          <div class="page-jump">
+          <div v-if="paginationExact" class="page-jump">
             <InputNumber
               v-model="pageJump"
               class="page-jump-input"
@@ -516,7 +537,12 @@
             <Button class="page-btn" outlined :disabled="loading" @click="jumpToPage">{{ t('logs.jump') }}</Button>
           </div>
         </div>
-        <Button class="page-btn" outlined :disabled="loading || currentPage >= totalPages" @click="nextPage">
+        <Button
+          class="page-btn"
+          outlined
+          :disabled="loading || (paginationExact ? currentPage >= totalPages : !hasMore)"
+          @click="nextPage"
+        >
           {{ t('logs.nextPage') }} &gt;
         </Button>
       </div>
@@ -830,6 +856,8 @@ const pageSize = ref(Number(getUserPreference('logsPageSize', '100')));
 const advancedFiltersOpen = ref(false);
 const currentPage = ref(1);
 const totalPages = ref(0);
+const hasMore = ref(false);
+const paginationExact = ref(true);
 const pageJump = ref<number | null>(null);
 const reparseDialogVisible = ref(false);
 const reparseLoading = ref(false);
@@ -1040,6 +1068,25 @@ const exportStatusLabel = computed(() => {
       return status;
   }
 });
+const hasActiveLogFilters = computed(() =>
+  Boolean(currentWebsiteId.value) &&
+  Boolean(
+    searchFilter.value ||
+    statusCodeFilter.value.trim() ||
+    excludeInternal.value ||
+    pageviewOnly.value ||
+    excludeSpider.value ||
+    excludeForeign.value ||
+    dateRangePreset.value !== 'last7Days'
+  )
+);
+const logsEmptyTitle = computed(() =>
+  hasActiveLogFilters.value ? t('logs.filteredEmptyTitle') : t('logs.emptyTitle')
+);
+const logsEmptyText = computed(() =>
+  hasActiveLogFilters.value ? t('logs.filteredEmptyText') : t('logs.emptyText')
+);
+const showLogsEmptyOverlay = computed(() => !loading.value && logs.value.length === 0);
 const statusClassPreset = computed(() => parseStatusFilter(statusCodeFilter.value).statusClass || '');
 const isDemoMode = computed(() => demoMode?.value ?? false);
 const reparseDialogTitle = computed(() =>
@@ -1140,6 +1187,24 @@ function resolveStatusParams() {
 
 function setStatusCodePreset(preset: string) {
   statusCodeFilter.value = preset;
+}
+
+function clearLogFilters() {
+  searchInput.value = '';
+  searchFilter.value = '';
+  statusCodeFilter.value = '';
+  excludeInternal.value = false;
+  pageviewOnly.value = false;
+  excludeSpider.value = false;
+  excludeForeign.value = false;
+  advancedFiltersOpen.value = false;
+  currentPage.value = 1;
+  updatingDatePreset = true;
+  dateRangePreset.value = 'last7Days';
+  applyDatePreset('last7Days');
+  updatingDatePreset = false;
+  saveUserPreference('logsDatePreset', dateRangePreset.value || '');
+  loadLogs();
 }
 
 function buildExportParams() {
@@ -2009,10 +2074,11 @@ function initPreferences() {
   timeStart.value = getUserPreference('logsTimeStart', '');
   timeEnd.value = getUserPreference('logsTimeEnd', '');
   const savedPreset = getUserPreference('logsDatePreset', '');
-  if (savedPreset) {
+  const hasSavedRange = Boolean(timeStart.value || timeEnd.value);
+  if (savedPreset && !(savedPreset === 'all' && !hasSavedRange)) {
     dateRangePreset.value = savedPreset;
-  } else if (!timeStart.value && !timeEnd.value) {
-    dateRangePreset.value = 'all';
+  } else if (!hasSavedRange) {
+    dateRangePreset.value = 'last7Days';
   } else {
     dateRangePreset.value = 'custom';
   }
@@ -2028,6 +2094,27 @@ function applyRouteOverrides() {
   if (ipFilter) {
     searchInput.value = ipFilter;
     searchFilter.value = ipFilter;
+  }
+
+  const keywordFilter = getRouteQueryValue('filter');
+  if (keywordFilter) {
+    searchInput.value = keywordFilter;
+    searchFilter.value = keywordFilter;
+  }
+
+  const statusClass = getRouteQueryValue('statusClass');
+  if (statusClass) {
+    statusCodeFilter.value = statusClass;
+  }
+
+  const sortFieldOverride = getRouteQueryValue('sortField');
+  if (sortFieldOverride && sortFieldOptions.value.some((item) => item.value === sortFieldOverride)) {
+    sortField.value = sortFieldOverride;
+  }
+
+  const sortOrderOverride = getRouteQueryValue('sortOrder');
+  if (sortOrderOverride === 'asc' || sortOrderOverride === 'desc') {
+    sortOrder.value = sortOrderOverride;
   }
 
   const start = getRouteQueryValue('timeStart');
@@ -2097,12 +2184,16 @@ async function loadLogs() {
       excludeForeign.value
     );
     rawLogs.value = result.logs || [];
-    totalPages.value = result.pagination?.pages || 0;
+    paginationExact.value = result.pagination?.exact !== false;
+    hasMore.value = Boolean(result.pagination?.hasMore);
+    totalPages.value = paginationExact.value ? result.pagination?.pages || 0 : 0;
     applyParsingStatus(result);
   } catch (error) {
     console.error('加载日志失败:', error);
     rawLogs.value = [];
     totalPages.value = 0;
+    hasMore.value = false;
+    paginationExact.value = true;
     ipParsing.value = false;
     ipParsingProgress.value = null;
     parsingPending.value = false;
@@ -2288,6 +2379,9 @@ async function confirmReparse() {
 }
 
 function jumpToPage() {
+  if (!paginationExact.value) {
+    return;
+  }
   const pageNum = pageJump.value ?? 1;
   if (!Number.isFinite(pageNum) || pageNum < 1 || pageNum > totalPages.value) {
     return;
@@ -2304,7 +2398,7 @@ function prevPage() {
 }
 
 function nextPage() {
-  if (currentPage.value < totalPages.value) {
+  if ((paginationExact.value && currentPage.value < totalPages.value) || (!paginationExact.value && hasMore.value)) {
     currentPage.value += 1;
     loadLogs();
   }
@@ -2613,6 +2707,7 @@ function nextPage() {
 }
 
 .logs-table-wrapper {
+  --logs-table-head-offset: 52px;
   overflow: hidden;
   width: 100%;
   flex: 1;
@@ -2725,6 +2820,96 @@ function nextPage() {
   border: 2px solid rgba(var(--primary-color-rgb), 0.25);
   border-top-color: var(--primary);
   animation: logs-spin 0.8s linear infinite;
+}
+
+.logs-empty-overlay {
+  position: absolute;
+  inset: var(--logs-table-head-offset) 0 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 24px 32px;
+  pointer-events: none;
+}
+
+.logs-empty-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(247, 249, 255, 0.8), rgba(255, 255, 255, 0.92));
+}
+
+.logs-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.logs-empty-state-overlay {
+  position: relative;
+  z-index: 1;
+  width: min(380px, 100%);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: auto;
+}
+
+.logs-empty-state-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--primary);
+  background: rgba(var(--primary-color-rgb), 0.12);
+}
+
+.logs-empty-state-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.logs-empty-state-text {
+  max-width: 300px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.logs-empty-action {
+  margin-top: 6px;
+}
+
+:global(body.dark-mode) .logs-empty-state-icon {
+  color: #8bb8ff;
+  background: rgba(var(--primary-color-rgb), 0.16);
+}
+
+:global(body.dark-mode) .logs-empty-overlay::before {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.72));
+}
+
+:global(body.dark-mode) .logs-empty-state-overlay {
+  background: transparent;
+  box-shadow: none;
+}
+
+:global(body.dark-mode) .logs-empty-state-title {
+  color: rgba(241, 245, 249, 0.94);
+}
+
+:global(body.dark-mode) .logs-empty-state-text {
+  color: rgba(148, 163, 184, 0.92);
 }
 
 @keyframes logs-spin {
