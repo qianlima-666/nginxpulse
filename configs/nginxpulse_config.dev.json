@@ -34,11 +34,11 @@
           "type": "sftp",
           "pollInterval": "5s",
           "path": "/home/likai/web-services/nginx_data/logs/kaisir/access.log",
-          "host": "192.168.6.131",
+          "host": "192.168.6.101",
           "port": 22,
           "user": "root",
           "auth": {
-            "keyFile": "/Users/likai/.ssh/nginxpulse_sftp"
+            "password": "luckyme.0414"
           }
         }
       ]

@@ -639,7 +639,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import {
@@ -1083,27 +1083,54 @@ watch(currentDate, (value) => {
   loadDailyReport();
 });
 
-watch(timeSeries, (stats) => {
-  if (stats) {
+watch(
+  timeSeries,
+  async (stats) => {
+    if (!stats) {
+      renderTrend(null);
+      return;
+    }
+    await nextTick();
     renderTrend(stats);
-  }
-});
+  },
+  { flush: 'post' }
+);
 
-watch(developerDaily, (stats) => {
-  renderDeveloperTrend(stats?.trend || null);
-});
+watch(
+  developerDaily,
+  async (stats) => {
+    await nextTick();
+    renderDeveloperTrend(stats?.trend || null);
+  },
+  { flush: 'post' }
+);
 
-watch(sourceGroups, (groups) => {
-  renderSourceDonut(groups);
-});
+watch(
+  sourceGroups,
+  async (groups) => {
+    await nextTick();
+    renderSourceDonut(groups);
+  },
+  { flush: 'post' }
+);
 
-watch(visitorRows, () => {
-  renderVisitorDonut();
-});
+watch(
+  visitorRows,
+  async () => {
+    await nextTick();
+    renderVisitorDonut();
+  },
+  { flush: 'post' }
+);
 
-watch(deviceCards, () => {
-  renderDeviceDonut();
-});
+watch(
+  deviceCards,
+  async () => {
+    await nextTick();
+    renderDeviceDonut();
+  },
+  { flush: 'post' }
+);
 
 function initDateFromQuery() {
   const queryDate = getDateFromQuery();
@@ -1150,7 +1177,25 @@ async function loadWebsites() {
 
 async function loadDailyReport() {
   if (!currentWebsiteId.value || !currentDate.value) {
+    overall.value = null;
+    sessionSummary.value = null;
+    sessionSummaryPrev.value = null;
     developerDaily.value = null;
+    timeSeries.value = null;
+    refererStats.value = null;
+    refererPrev.value = null;
+    refererIPBatch.value = null;
+    refererIPBatchPrev.value = null;
+    urlStats.value = null;
+    urlPrev.value = null;
+    deviceStats.value = null;
+    devicePrev.value = null;
+    osStats.value = null;
+    osPrev.value = null;
+    browserStats.value = null;
+    browserPrev.value = null;
+    cityStats.value = null;
+    cityPrev.value = null;
     return;
   }
 
@@ -1159,27 +1204,7 @@ async function loadDailyReport() {
   const prevDate = shiftDate(dateStr, -1);
 
   try {
-    const [
-      overallData,
-      sessionData,
-      sessionPrevData,
-      developerDailyData,
-      timeSeriesData,
-      refererData,
-      refererPrevData,
-      refererIPBatchData,
-      refererIPBatchPrevData,
-      urlData,
-      urlPrevData,
-      deviceData,
-      devicePrevData,
-      osData,
-      osPrevData,
-      browserData,
-      browserPrevData,
-      cityData,
-      cityPrevData,
-    ] = await Promise.all([
+    const requests = await Promise.allSettled([
       fetchOverallStats(currentWebsiteId.value, dateStr),
       fetchSessionSummary(currentWebsiteId.value, dateStr),
       fetchSessionSummary(currentWebsiteId.value, prevDate),
@@ -1205,38 +1230,65 @@ async function loadDailyReport() {
       return;
     }
 
-    overall.value = overallData;
-    sessionSummary.value = sessionData;
-    sessionSummaryPrev.value = sessionPrevData;
-    developerDaily.value = developerDailyData;
-    timeSeries.value = timeSeriesData;
-    refererStats.value = refererData;
-    refererPrev.value = refererPrevData;
-    refererIPBatch.value = refererIPBatchData;
-    refererIPBatchPrev.value = refererIPBatchPrevData;
-    urlStats.value = urlData;
-    urlPrev.value = urlPrevData;
-    deviceStats.value = deviceData;
-    devicePrev.value = devicePrevData;
-    osStats.value = osData;
-    osPrev.value = osPrevData;
-    browserStats.value = browserData;
-    browserPrev.value = browserPrevData;
-    cityStats.value = cityData;
-    cityPrev.value = cityPrevData;
+    const pickResult = <T>(index: number, label: string): T | null => {
+      const result = requests[index];
+      if (result.status === 'fulfilled') {
+        return result.value as T;
+      }
+      console.error(`加载日报分块失败: ${label}`, result.reason);
+      return null;
+    };
+
+    overall.value = pickResult<Record<string, any>>(0, 'overall');
+    sessionSummary.value = pickResult<Record<string, any>>(1, 'session_summary');
+    sessionSummaryPrev.value = pickResult<Record<string, any>>(2, 'session_summary_prev');
+    developerDaily.value = pickResult<DeveloperDailyStats>(3, 'developer_daily');
+    timeSeries.value = pickResult<TimeSeriesStats>(4, 'timeseries');
+    refererStats.value = pickResult<SimpleSeriesStats>(5, 'referer');
+    refererPrev.value = pickResult<SimpleSeriesStats>(6, 'referer_prev');
+    refererIPBatch.value = pickResult<RefererIPBatchStats>(7, 'referer_ip_batch');
+    refererIPBatchPrev.value = pickResult<RefererIPBatchStats>(8, 'referer_ip_batch_prev');
+    urlStats.value = pickResult<SimpleSeriesStats>(9, 'url');
+    urlPrev.value = pickResult<SimpleSeriesStats>(10, 'url_prev');
+    deviceStats.value = pickResult<SimpleSeriesStats>(11, 'device');
+    devicePrev.value = pickResult<SimpleSeriesStats>(12, 'device_prev');
+    osStats.value = pickResult<SimpleSeriesStats>(13, 'os');
+    osPrev.value = pickResult<SimpleSeriesStats>(14, 'os_prev');
+    browserStats.value = pickResult<SimpleSeriesStats>(15, 'browser');
+    browserPrev.value = pickResult<SimpleSeriesStats>(16, 'browser_prev');
+    cityStats.value = pickResult<SimpleSeriesStats>(17, 'location_city');
+    cityPrev.value = pickResult<SimpleSeriesStats>(18, 'location_city_prev');
   } catch (error) {
     console.error('加载日报失败:', error);
+    overall.value = null;
+    sessionSummary.value = null;
+    sessionSummaryPrev.value = null;
     developerDaily.value = null;
+    timeSeries.value = null;
+    refererStats.value = null;
+    refererPrev.value = null;
+    refererIPBatch.value = null;
+    refererIPBatchPrev.value = null;
+    urlStats.value = null;
+    urlPrev.value = null;
+    deviceStats.value = null;
+    devicePrev.value = null;
+    osStats.value = null;
+    osPrev.value = null;
+    browserStats.value = null;
+    browserPrev.value = null;
+    cityStats.value = null;
+    cityPrev.value = null;
   }
 }
 
-function renderTrend(stats: TimeSeriesStats) {
-  if (!ipChartRef.value) {
-    return;
-  }
+function renderTrend(stats: TimeSeriesStats | null) {
   if (ipChart) {
     ipChart.destroy();
     ipChart = null;
+  }
+  if (!ipChartRef.value || !stats) {
+    return;
   }
   if (!hasPositiveSeriesValues(stats.visitors)) {
     return;

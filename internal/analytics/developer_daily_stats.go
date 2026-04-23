@@ -211,12 +211,12 @@ func (m *DeveloperDailyStatsManager) queryDaySnapshot(
 	query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
 		SELECT
 			COUNT(*) AS total_requests,
-			SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) AS status_4xx,
-			SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) AS status_5xx,
-			SUM(CASE WHEN request_time_ms >= ? THEN 1 ELSE 0 END) AS slow_requests,
-			SUM(CASE WHEN request_time_ms > 0 THEN 1 ELSE 0 END) AS timed_requests,
-			SUM(CASE WHEN upstream_response_time_ms > 0 THEN 1 ELSE 0 END) AS upstream_timed_requests,
-			SUM(CASE WHEN request_length > 0 THEN 1 ELSE 0 END) AS size_requests,
+			COALESCE(SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END), 0) AS status_4xx,
+			COALESCE(SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END), 0) AS status_5xx,
+			COALESCE(SUM(CASE WHEN request_time_ms >= ? THEN 1 ELSE 0 END), 0) AS slow_requests,
+			COALESCE(SUM(CASE WHEN request_time_ms > 0 THEN 1 ELSE 0 END), 0) AS timed_requests,
+			COALESCE(SUM(CASE WHEN upstream_response_time_ms > 0 THEN 1 ELSE 0 END), 0) AS upstream_timed_requests,
+			COALESCE(SUM(CASE WHEN request_length > 0 THEN 1 ELSE 0 END), 0) AS size_requests,
 			COALESCE(AVG(NULLIF(request_time_ms, 0)), 0) AS avg_request_time_ms,
 			COALESCE(AVG(NULLIF(upstream_response_time_ms, 0)), 0) AS avg_upstream_time_ms,
 			COALESCE(AVG(NULLIF(request_length, 0)), 0) AS avg_request_size_bytes
@@ -254,25 +254,7 @@ func (m *DeveloperDailyStatsManager) queryTopIssues(
 	currentStart, currentEnd time.Time,
 	prevStart, prevEnd time.Time,
 ) ([]DeveloperDailyURLIssue, error) {
-	tableName := fmt.Sprintf(`"%s_nginx_logs"`, websiteID)
-	query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
-		SELECT
-			url,
-			COUNT(*) AS requests,
-			SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) AS errors_5xx,
-			SUM(CASE WHEN request_time_ms >= ? THEN 1 ELSE 0 END) AS slow_requests,
-			COALESCE(AVG(NULLIF(request_time_ms, 0)), 0) AS avg_request_time_ms,
-			COALESCE(MAX(request_time_ms), 0) AS max_request_time_ms
-		FROM %s
-		WHERE timestamp >= ? AND timestamp < ?
-		GROUP BY url
-		HAVING
-			SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) > 0
-			OR SUM(CASE WHEN request_time_ms >= ? THEN 1 ELSE 0 END) > 0
-			OR COALESCE(AVG(NULLIF(request_time_ms, 0)), 0) >= ?
-		ORDER BY errors_5xx DESC, slow_requests DESC, avg_request_time_ms DESC, requests DESC
-		LIMIT ?`,
-		tableName))
+	query := buildDeveloperTopIssuesQuery(websiteID)
 
 	rows, err := m.repo.GetDB().Query(
 		query,
@@ -343,19 +325,7 @@ func (m *DeveloperDailyStatsManager) queryIssueForURL(
 	if url == "" {
 		return result, nil
 	}
-	tableName := fmt.Sprintf(`"%s_nginx_logs"`, websiteID)
-	query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
-		SELECT
-			url,
-			COUNT(*) AS requests,
-			SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) AS errors_5xx,
-			SUM(CASE WHEN request_time_ms >= ? THEN 1 ELSE 0 END) AS slow_requests,
-			COALESCE(AVG(NULLIF(request_time_ms, 0)), 0) AS avg_request_time_ms,
-			COALESCE(MAX(request_time_ms), 0) AS max_request_time_ms
-		FROM %s
-		WHERE timestamp >= ? AND timestamp < ? AND url = ?
-		GROUP BY url`,
-		tableName))
+	query := buildDeveloperIssueForURLQuery(websiteID)
 
 	row := m.repo.GetDB().QueryRow(query, developerSlowThresholdMs, startTime.Unix(), endTime.Unix(), url)
 	item, err := scanDeveloperIssueRow(row)
@@ -388,6 +358,48 @@ func scanDeveloperIssueRow(scanner developerIssueScanner) (developerIssueRow, er
 	}
 	item.avgRequestTimeMs = nullableFloat(avgRequestTimeMs)
 	return item, nil
+}
+
+func buildDeveloperTopIssuesQuery(websiteID string) string {
+	logTable := fmt.Sprintf(`"%s_nginx_logs"`, websiteID)
+	urlTable := fmt.Sprintf(`"%s_dim_url"`, websiteID)
+	return sqlutil.ReplacePlaceholders(fmt.Sprintf(`
+		SELECT
+			u.url,
+			COUNT(*) AS requests,
+			SUM(CASE WHEN l.status_code >= 500 AND l.status_code < 600 THEN 1 ELSE 0 END) AS errors_5xx,
+			SUM(CASE WHEN l.request_time_ms >= ? THEN 1 ELSE 0 END) AS slow_requests,
+			COALESCE(AVG(NULLIF(l.request_time_ms, 0)), 0) AS avg_request_time_ms,
+			COALESCE(MAX(l.request_time_ms), 0) AS max_request_time_ms
+		FROM %s l
+		JOIN %s u ON u.id = l.url_id
+		WHERE l.timestamp >= ? AND l.timestamp < ?
+		GROUP BY u.url
+		HAVING
+			SUM(CASE WHEN l.status_code >= 500 AND l.status_code < 600 THEN 1 ELSE 0 END) > 0
+			OR SUM(CASE WHEN l.request_time_ms >= ? THEN 1 ELSE 0 END) > 0
+			OR COALESCE(AVG(NULLIF(l.request_time_ms, 0)), 0) >= ?
+		ORDER BY errors_5xx DESC, slow_requests DESC, avg_request_time_ms DESC, requests DESC
+		LIMIT ?`,
+		logTable, urlTable))
+}
+
+func buildDeveloperIssueForURLQuery(websiteID string) string {
+	logTable := fmt.Sprintf(`"%s_nginx_logs"`, websiteID)
+	urlTable := fmt.Sprintf(`"%s_dim_url"`, websiteID)
+	return sqlutil.ReplacePlaceholders(fmt.Sprintf(`
+		SELECT
+			u.url,
+			COUNT(*) AS requests,
+			SUM(CASE WHEN l.status_code >= 500 AND l.status_code < 600 THEN 1 ELSE 0 END) AS errors_5xx,
+			SUM(CASE WHEN l.request_time_ms >= ? THEN 1 ELSE 0 END) AS slow_requests,
+			COALESCE(AVG(NULLIF(l.request_time_ms, 0)), 0) AS avg_request_time_ms,
+			COALESCE(MAX(l.request_time_ms), 0) AS max_request_time_ms
+		FROM %s l
+		JOIN %s u ON u.id = l.url_id
+		WHERE l.timestamp >= ? AND l.timestamp < ? AND u.url = ?
+		GROUP BY u.url`,
+		logTable, urlTable))
 }
 
 func buildDeveloperMetric(current, previous float64) DeveloperMetric {
