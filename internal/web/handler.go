@@ -81,6 +81,8 @@ func SetupRoutes(
 		})
 	})
 
+	registerServerStatusRoute(router)
+
 	router.GET("/api/system/notifications", func(c *gin.Context) {
 		if statsFactory == nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{

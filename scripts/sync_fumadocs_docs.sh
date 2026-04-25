@@ -18,10 +18,14 @@ fi
 
 mkdir -p "$TARGET_DIR"
 
-# Keep index.mdx and meta.json managed by Fumadocs, refresh only markdown docs.
+# Keep index.mdx managed by Fumadocs, refresh markdown docs and sidebar metadata.
 find "$TARGET_DIR" -maxdepth 1 -type f -name '*.md' -delete
 
 escape_yaml_double_quoted() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}
+
+escape_json_string() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
@@ -62,5 +66,37 @@ for src in "$WIKI_DIR"/*.md; do
   } > "$tmp"
   mv "$tmp" "$dest"
 done
+
+sidebar="$WIKI_DIR/_Sidebar.md"
+if [[ -f "$sidebar" ]]; then
+  pages=()
+  while IFS= read -r page; do
+    pages+=("$page")
+  done < <(
+    sed -n 's/^[[:space:]]*[*-][[:space:]]*\[[^]]*\](\([^):#][^)]*\)).*$/\1/p' "$sidebar" |
+      awk 'NF && !seen[$0]++'
+  )
+
+  if [[ "${#pages[@]}" -gt 0 ]]; then
+    meta="$TARGET_DIR/meta.json"
+    tmp="$(mktemp)"
+    {
+      printf '%s\n' '{'
+      printf '  "title": "NginxPulse Docs",\n'
+      printf '  "pages": [\n'
+      for i in "${!pages[@]}"; do
+        page="$(escape_json_string "${pages[$i]}")"
+        if [[ "$i" -eq "$((${#pages[@]} - 1))" ]]; then
+          printf '    "%s"\n' "$page"
+        else
+          printf '    "%s",\n' "$page"
+        fi
+      done
+      printf '  ]\n'
+      printf '%s\n' '}'
+    } > "$tmp"
+    mv "$tmp" "$meta"
+  fi
+fi
 
 echo "Synced wiki markdown files to $TARGET_DIR"

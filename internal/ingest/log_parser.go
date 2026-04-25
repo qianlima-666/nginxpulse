@@ -28,6 +28,7 @@ var (
 	defaultIISW3CLogRegex       = `^(?P<time>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+\S+\s+(?P<method>\S+)\s+(?P<url>\S+)\s+(?P<query>\S+)\s+\S+\s+\S+\s+(?P<ip>\S+)\s+(?P<ua>\S+)\s+(?P<referer>\S+)\s+(?P<status>\d{3})(?:\s+\S+){3}\s*$`
 	defaultNPMLogRegex          = `^\[(?P<time>[^\]]+)\] - (?P<status>\d+) (?P<upstream_status>\d+) - (?P<method>\S+) (?P<scheme>\S+) (?P<host>\S+) "(?P<path>[^"]+)" \[Client (?P<ip>[^\]]+)\] \[Length (?P<bytes>\d+)\] \[Gzip (?P<gzip>[^\]]+)\] \[Sent-to (?P<upstream>[^\]]+)\] "(?P<ua>[^"]+)" "(?P<referer>[^"]*)"`
 	defaultSafeLineWAFLogRegex  = `^(?P<ip>\S+)\s*(?:\|\s*|-\s+)(?P<user>\S+)\s*(?:\|\s*|\[\s*)(?P<time>[^\]|]+?)(?:\]\s+|\s*\|\s*)"(?P<host>[^"]*)"\s*(?:\|\s*|\s+)"(?P<request>[^"]*)"\s*(?:\|\s*|\s+)(?P<status>\d{3})\s*(?:\|\s*|\s+)(?P<bytes>\d+|-)\s*(?:\|\s*|\s+)"(?P<referer>[^"]*)"\s*(?:\|\s*|\s+)"(?P<ua>[^"]*)"(?:\s*(?:\|\s*|\s+)"(?P<http_x_forwarded_for>[^"]*)")?$`
+	defaultZoraxyLogRegex       = `^\[?(?P<time>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?)\]?\s+\[router:(?P<router>[^\]]+)\]\s+\[origin:(?P<host>[^\]]*)\]\s+\[client:\s*(?P<ip>[^\]]+)\]\s+\[useragent:\s*(?P<ua>[^\]]*)\]\s+(?P<method>\S+)\s+(?P<url>\S+)\s+(?P<status>\d{3})\s*$`
 	lastCleanupDate             = ""
 	parsingMu                   sync.RWMutex
 	parsingMode                 parseMode
@@ -37,6 +38,7 @@ var (
 const defaultNginxTimeLayout = "02/Jan/2006:15:04:05 -0700"
 const defaultHAProxyTimeLayout = "02/Jan/2006:15:04:05.000"
 const defaultIISTimeLayout = "2006-01-02 15:04:05"
+const defaultZoraxyTimeLayout = "2006-01-02 15:04:05.000000"
 
 const (
 	parseTypeRegex     = "regex"
@@ -578,6 +580,7 @@ func (p *LogParser) ScanNginxLogs() []ParserResult {
 	if p.demoMode {
 		return []ParserResult{}
 	}
+	p.discoverAutoHostWebsites()
 	websiteIDs := config.GetAllWebsiteIDs()
 	stage := parseStagePeriodic
 	if p.hasUnparsedWebsite(websiteIDs) {

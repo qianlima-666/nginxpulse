@@ -54,7 +54,15 @@
     "demoMode": false,
     "accessKeys": [],
     "language": "zh-CN",
-    "mobilePwaEnabled": false
+    "mobilePwaEnabled": false,
+    "serverStatus": {
+      "enabled": true,
+      "mockEnabled": false,
+      "metricsUrl": "http://192.168.6.150:9911/json",
+      "disksUrl": "http://192.168.6.150:9911/disks",
+      "timeout": "5s",
+      "refreshInterval": "3s"
+    }
   },
   "database": {
     "driver": "postgres",

@@ -30,4 +30,9 @@ export const getUserPreference = <T extends string>(key: string, defaultValue: T
   return (saved || defaultValue) as T;
 };
 
-export { getMobileBasePathWithSlash, getWebBasePath, getWebBasePathWithSlash } from './base-path';
+export {
+  getInitialServerStatusEnabled,
+  getMobileBasePathWithSlash,
+  getWebBasePath,
+  getWebBasePathWithSlash,
+} from './base-path';

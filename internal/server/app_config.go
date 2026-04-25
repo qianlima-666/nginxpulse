@@ -14,7 +14,10 @@ func attachAppConfig(router *gin.Engine) {
 		if err != nil {
 			c.Header("Content-Type", "application/javascript; charset=utf-8")
 			c.Header("Cache-Control", "no-store")
-			c.String(http.StatusOK, "window.__NGINXPULSE_BASE_PATH__ = \"\";")
+			c.String(
+				http.StatusOK,
+				"window.__NGINXPULSE_BASE_PATH__ = \"\";\nwindow.__NGINXPULSE_SERVER_STATUS_ENABLED__ = false;",
+			)
 			return
 		}
 		base := config.NormalizeWebBasePath(cfg.System.WebBasePath)
@@ -23,12 +26,14 @@ func attachAppConfig(router *gin.Engine) {
 			prefix = "/" + base
 		}
 		payload, _ := json.Marshal(prefix)
+		serverStatusEnabled, _ := json.Marshal(cfg.System.ServerStatus.Enabled)
 		c.Header("Content-Type", "application/javascript; charset=utf-8")
 		c.Header("Cache-Control", "no-store")
 		c.String(
 			http.StatusOK,
-			"window.__NGINXPULSE_BASE_PATH__ = %s;",
+			"window.__NGINXPULSE_BASE_PATH__ = %s;\nwindow.__NGINXPULSE_SERVER_STATUS_ENABLED__ = %s;",
 			payload,
+			serverStatusEnabled,
 		)
 	}
 	router.GET("/app-config.js", handler)

@@ -90,6 +90,18 @@ jobs:
           LDFLAGS="-s -w -X 'github.com/likaia/nginxpulse/internal/version.Version=${VERSION}' -X 'github.com/likaia/nginxpulse/internal/version.BuildTime=${BUILD_TIME}' -X 'github.com/likaia/nginxpulse/internal/version.GitCommit=${GIT_COMMIT}'"
           go build -tags embed -ldflags="${LDFLAGS}" -o "dist/${bin_name}" ./cmd/nginxpulse/main.go
 
+      - name: Build agent binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          agent_name="nginxpulse-agent-${GOOS}-${GOARCH}"
+          if [ "${GOOS}" = "windows" ]; then
+            agent_name="${agent_name}.exe"
+          fi
+          go build -trimpath -ldflags="-s -w" -o "dist/${agent_name}" ./cmd/nginxpulse-agent
+
       - name: Copy config and gz samples
         run: |
           mkdir -p dist/configs
@@ -117,6 +129,15 @@ jobs:
           else
             archive="nginxpulse-${TAG_NAME}-${GOOS}-${GOARCH}.tar.gz"
             tar -czf "dist/${archive}" -C dist "${bin_name}" configs var
+          fi
+          agent_name="nginxpulse-agent-${GOOS}-${GOARCH}"
+          if [ "${GOOS}" = "windows" ]; then
+            agent_name="${agent_name}.exe"
+            agent_archive="nginxpulse-agent-${TAG_NAME}-${GOOS}-${GOARCH}.zip"
+            (cd dist && zip -q -r "${agent_archive}" "${agent_name}")
+          else
+            agent_archive="nginxpulse-agent-${TAG_NAME}-${GOOS}-${GOARCH}.tar.gz"
+            tar -czf "dist/${agent_archive}" -C dist "${agent_name}"
           fi
 
       - name: Generate checksums

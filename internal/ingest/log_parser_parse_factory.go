@@ -141,6 +141,12 @@ func newLogLineParser(website config.WebsiteConfig, sourceCfg *config.SourceConf
 		case "safeline", "safeline-waf", "raywaf", "ray-waf", "leichi", "leichi-waf":
 			pattern = defaultSafeLineWAFLogRegex
 			source = "safeline-waf"
+		case "zoraxy", "zoraxy-router":
+			pattern = defaultZoraxyLogRegex
+			source = "zoraxy"
+			if strings.TrimSpace(timeLayout) == "" {
+				timeLayout = defaultZoraxyTimeLayout
+			}
 		default:
 			return nil, fmt.Errorf("不支持的日志类型: %s", logType)
 		}

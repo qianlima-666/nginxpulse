@@ -29,6 +29,12 @@ const (
 	envLanguage                  = "APP_LANGUAGE"
 	envWebBasePath               = "WEB_BASE_PATH"
 	envMobilePWAEnabled          = "MOBILE_PWA_ENABLED"
+	envServerStatusEnabled       = "SERVER_STATUS_ENABLED"
+	envServerStatusMockEnabled   = "SERVER_STATUS_MOCK_ENABLED"
+	envServerStatusMetricsURL    = "SERVER_STATUS_METRICS_URL"
+	envServerStatusDisksURL      = "SERVER_STATUS_DISKS_URL"
+	envServerStatusTimeout       = "SERVER_STATUS_TIMEOUT"
+	envServerStatusRefresh       = "SERVER_STATUS_REFRESH_INTERVAL"
 	envIPGeoCacheLimit           = "IP_GEO_CACHE_LIMIT"
 	envIPGeoAPIURL               = "IP_GEO_API_URL"
 	envDBDriver                  = "DB_DRIVER"
@@ -68,6 +74,10 @@ var (
 		AccessKeyExpireDays:       7,
 		Language:                  "zh-CN",
 		MobilePWAEnabled:          false,
+		ServerStatus: ServerStatusConfig{
+			Timeout:         "5s",
+			RefreshInterval: "30s",
+		},
 	}
 	defaultServer = ServerConfig{
 		Port: ":8089",
@@ -265,6 +275,48 @@ func applyEnvOverrides(cfg *Config) error {
 		}
 		cfg.System.MobilePWAEnabled = parsed
 	}
+	if raw, key := getEnvValue(envServerStatusEnabled); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return fmt.Errorf("解析 %s 失败: %w", key, err)
+		}
+		cfg.System.ServerStatus.Enabled = parsed
+	}
+	if raw, key := getEnvValue(envServerStatusMockEnabled); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return fmt.Errorf("解析 %s 失败: %w", key, err)
+		}
+		cfg.System.ServerStatus.MockEnabled = parsed
+	}
+	if raw, _ := getEnvValue(envServerStatusMetricsURL); raw != "" {
+		cfg.System.ServerStatus.MetricsURL = strings.TrimSpace(raw)
+	}
+	if raw, _ := getEnvValue(envServerStatusDisksURL); raw != "" {
+		cfg.System.ServerStatus.DisksURL = strings.TrimSpace(raw)
+	}
+	if raw, key := getEnvValue(envServerStatusTimeout); raw != "" {
+		trimmed := strings.TrimSpace(raw)
+		parsed, err := time.ParseDuration(trimmed)
+		if err != nil {
+			return fmt.Errorf("解析 %s 失败: %w", key, err)
+		}
+		if parsed <= 0 {
+			return fmt.Errorf("%s 必须大于0", key)
+		}
+		cfg.System.ServerStatus.Timeout = trimmed
+	}
+	if raw, key := getEnvValue(envServerStatusRefresh); raw != "" {
+		trimmed := strings.TrimSpace(raw)
+		parsed, err := time.ParseDuration(trimmed)
+		if err != nil {
+			return fmt.Errorf("解析 %s 失败: %w", key, err)
+		}
+		if parsed <= 0 {
+			return fmt.Errorf("%s 必须大于0", key)
+		}
+		cfg.System.ServerStatus.RefreshInterval = trimmed
+	}
 
 	if raw, _ := getEnvValue(envServerPort); raw != "" {
 		if !strings.Contains(raw, ":") {
@@ -389,6 +441,20 @@ func applyDefaults(cfg *Config) {
 	}
 	cfg.System.Language = NormalizeLanguage(cfg.System.Language)
 	cfg.System.WebBasePath = NormalizeWebBasePath(cfg.System.WebBasePath)
+	cfg.System.ServerStatus.MetricsURL = strings.TrimSpace(cfg.System.ServerStatus.MetricsURL)
+	cfg.System.ServerStatus.DisksURL = strings.TrimSpace(cfg.System.ServerStatus.DisksURL)
+	cfg.System.ServerStatus.Timeout = strings.TrimSpace(cfg.System.ServerStatus.Timeout)
+	cfg.System.ServerStatus.RefreshInterval = strings.TrimSpace(cfg.System.ServerStatus.RefreshInterval)
+	if cfg.System.ServerStatus.Timeout == "" {
+		cfg.System.ServerStatus.Timeout = defaultSystem.ServerStatus.Timeout
+	} else if parsed, err := time.ParseDuration(cfg.System.ServerStatus.Timeout); err != nil || parsed <= 0 {
+		cfg.System.ServerStatus.Timeout = defaultSystem.ServerStatus.Timeout
+	}
+	if cfg.System.ServerStatus.RefreshInterval == "" {
+		cfg.System.ServerStatus.RefreshInterval = defaultSystem.ServerStatus.RefreshInterval
+	} else if parsed, err := time.ParseDuration(cfg.System.ServerStatus.RefreshInterval); err != nil || parsed <= 0 {
+		cfg.System.ServerStatus.RefreshInterval = defaultSystem.ServerStatus.RefreshInterval
+	}
 	if cfg.Server.Port == "" {
 		cfg.Server.Port = defaultServer.Port
 	}

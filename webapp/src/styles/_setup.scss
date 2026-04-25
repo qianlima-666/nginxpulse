@@ -743,6 +743,27 @@ body.dark-mode .setup-footer::before {
   box-shadow: var(--shadow-soft);
 }
 
+.setup-feature-card-compact {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.setup-feature-card-wide {
+  margin-top: 12px;
+}
+
+.setup-server-status-fields {
+  margin-top: 12px;
+}
+
+.setup-feature-card-compact .setup-feature-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
 .setup-feature-icon {
   width: 40px;
   height: 40px;

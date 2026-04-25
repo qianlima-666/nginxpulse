@@ -206,6 +206,10 @@ func (r *Repository) ensureWebsiteSchema(websiteID string) error {
 	return r.backfillSessionAggregatesIfEmpty(websiteID)
 }
 
+func (r *Repository) EnsureWebsiteSchema(websiteID string) error {
+	return r.ensureWebsiteSchema(websiteID)
+}
+
 func (r *Repository) migrateLegacyLogs(websiteID string) error {
 	logTable := fmt.Sprintf("%s_nginx_logs", websiteID)
 	newLogTable := fmt.Sprintf("%s_nginx_logs_new", websiteID)

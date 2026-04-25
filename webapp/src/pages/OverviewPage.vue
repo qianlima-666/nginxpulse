@@ -203,6 +203,132 @@
       </div>
     </section>
 
+    <section v-if="serverStatusVisible" class="server-status-grid">
+      <div class="card server-status-card" data-anim>
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon green"><i class="ri-server-line"></i></span>
+            {{ t('overview.serverStatusTitle') }}
+          </div>
+          <div class="server-status-head-meta">
+            <span class="server-status-chip" :class="serverStatusClass">
+              <span class="server-status-dot" aria-hidden="true"></span>
+              {{ serverStatusLabel }}
+            </span>
+            <span v-if="serverStatusUpdatedAt" class="server-status-updated">{{ serverStatusUpdatedAt }}</span>
+          </div>
+        </div>
+        <div v-if="serverStatusLoading && !serverStatus" class="server-status-skeleton" aria-busy="true">
+          <div class="server-status-tile-grid">
+            <div
+              v-for="index in 5"
+              :key="`server-status-skeleton-${index}`"
+              class="server-status-tile server-status-skeleton-tile"
+            >
+              <span class="server-status-skeleton-icon"></span>
+              <span class="server-status-skeleton-line short"></span>
+              <span class="server-status-skeleton-line value"></span>
+              <span class="server-status-skeleton-line"></span>
+            </div>
+          </div>
+          <div class="server-status-skeleton-disk">
+            <span class="server-status-skeleton-line short"></span>
+            <span class="server-status-skeleton-line value"></span>
+            <span class="server-status-skeleton-line"></span>
+          </div>
+        </div>
+        <div v-else-if="serverStatusError" class="server-status-error">
+          <i class="ri-error-warning-line" aria-hidden="true"></i>
+          <span>{{ serverStatusError }}</span>
+        </div>
+        <template v-else>
+          <div class="server-status-dashboard">
+            <div class="server-status-tile-grid">
+              <div class="server-status-tile health" :class="serverHealthTone">
+                <div class="server-status-tile-icon">
+                  <i class="ri-shield-check-line" aria-hidden="true"></i>
+                </div>
+                <div class="server-status-tile-main">
+                  <span>{{ t('overview.serverStatusHealthScore') }}</span>
+                  <strong>{{ serverHealthScore }}%</strong>
+                  <small>{{ serverStatusLabel }}</small>
+                </div>
+              </div>
+
+              <div
+                v-for="item in serverStatusSensorRows"
+                :key="item.key"
+                class="server-status-tile"
+                :class="[item.tone, { 'is-fan': item.key === 'cpu-fan' }]"
+                :style="item.style"
+              >
+                <div class="server-status-tile-icon">
+                  <span v-if="item.key === 'cpu-fan'" class="server-fan-icon" aria-hidden="true">
+                    <span class="server-fan-blade"></span>
+                    <span class="server-fan-blade"></span>
+                    <span class="server-fan-blade"></span>
+                  </span>
+                  <i v-else :class="item.icon" aria-hidden="true"></i>
+                </div>
+                <div class="server-status-tile-main">
+                  <span class="server-status-tile-label">
+                    {{ item.label }}
+                    <em v-if="item.key === 'cpu-fan'">RPM</em>
+                  </span>
+                  <div v-if="item.key === 'cpu-fan'" class="server-fan-values">
+                    <span>
+                      <small>{{ t('overview.serverStatusFanCpuShort') }}</small>
+                      <strong>{{ item.cpuValue }}</strong>
+                    </span>
+                    <span>
+                      <small>{{ t('overview.serverStatusFanChassisShort') }}</small>
+                      <strong>{{ item.chassisValue }}</strong>
+                    </span>
+                  </div>
+                  <strong v-else>{{ item.value }}</strong>
+                  <div class="server-status-tile-track" aria-hidden="true">
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="primaryServerDisk" class="server-disk-summary" :class="diskTone(primaryServerDisk)">
+              <div class="server-disk-summary-main">
+                <div class="server-disk-summary-icon">
+                  <i class="ri-hard-drive-3-line" aria-hidden="true"></i>
+                </div>
+                <div>
+                  <div class="server-disk-summary-title">{{ t('overview.serverStatusDiskSmart') }}</div>
+                  <div class="server-disk-summary-sub">{{ serverDiskSummaryText }}</div>
+                </div>
+              </div>
+
+              <div class="server-disk-summary-stats">
+                <span v-for="stat in serverDiskSummaryStats" :key="stat.key">
+                  <small>{{ stat.label }}</small>
+                  <strong>{{ stat.value }}</strong>
+                </span>
+              </div>
+
+              <button
+                v-if="serverDisks.length"
+                type="button"
+                class="server-disk-view-all"
+                @click="serverDiskDialogVisible = true"
+              >
+                <i class="ri-list-check-3" aria-hidden="true"></i>
+                <span>{{ serverDiskActionText }}</span>
+              </button>
+            </div>
+          </div>
+          <div v-if="serverStatusMessages.length" class="server-status-messages">
+            <span v-for="message in serverStatusMessages" :key="message">{{ message }}</span>
+          </div>
+        </template>
+      </div>
+    </section>
+
     <section class="trend-grid">
       <div class="card trend-card" data-anim>
         <div class="card-header">
@@ -500,6 +626,90 @@
       </div>
     </section>
 
+    <Dialog
+      v-model:visible="serverDiskDialogVisible"
+      modal
+      :header="t('overview.serverStatusAllDisksTitle')"
+      class="server-disk-dialog"
+      :style="{ width: 'min(1120px, calc(100vw - 32px))' }"
+    >
+      <div class="server-disk-dialog-body">
+        <div class="server-disk-dialog-toolbar">
+          <div class="server-disk-dialog-summary">
+            <span>{{ serverDiskDialogSummary }}</span>
+            <span>{{ t('overview.serverStatusUpdatedAt', { value: serverStatusUpdatedAt }) }}</span>
+          </div>
+          <div class="server-disk-sort-tabs" role="tablist" :aria-label="t('overview.serverStatusDiskSort')">
+            <button
+              v-for="option in serverDiskSortOptions"
+              :key="option.value"
+              type="button"
+              class="server-disk-sort-tab"
+              :class="{ active: serverDiskSortKey === option.value }"
+              :aria-pressed="serverDiskSortKey === option.value"
+              @click="serverDiskSortKey = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="server-disk-table-wrap">
+          <table class="ranking-table server-disk-table">
+            <thead>
+              <tr>
+                <th class="server-disk-status-col">{{ t('overview.serverStatusDiskColStatus') }}</th>
+                <th class="server-disk-device-col">{{ t('overview.serverStatusDiskColDevice') }}</th>
+                <th>{{ t('overview.serverStatusDiskColCapacity') }}</th>
+                <th>{{ t('overview.serverStatusDiskColTemp') }}</th>
+                <th>{{ t('overview.serverStatusDiskColHealth') }}</th>
+                <th>{{ t('overview.serverStatusDiskColIo') }}</th>
+                <th>{{ t('overview.serverStatusDiskColPower') }}</th>
+                <th>{{ t('overview.serverStatusDiskColErrors') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="disk in serverDiskDialogRows" :key="disk.key" :class="disk.tone">
+                <td>
+                  <span class="server-disk-status-pill" :class="disk.tone">
+                    <i :class="disk.icon" aria-hidden="true"></i>
+                    {{ disk.status }}
+                  </span>
+                </td>
+                <td>
+                  <div class="server-disk-table-main">
+                    <span :title="disk.model">{{ disk.model }}</span>
+                    <small :title="disk.path">{{ disk.path }}</small>
+                  </div>
+                </td>
+                <td>
+                  <div class="server-disk-table-stack">
+                    <span>{{ disk.capacity }}</span>
+                    <small>{{ disk.type }}</small>
+                  </div>
+                </td>
+                <td>{{ disk.temperature }}</td>
+                <td>{{ disk.health }}</td>
+                <td>
+                  <div class="server-disk-table-stack">
+                    <span>{{ t('overview.serverStatusWritten') }} {{ disk.written }}</span>
+                    <small>{{ t('overview.serverStatusRead') }} {{ disk.read }}</small>
+                  </div>
+                </td>
+                <td>{{ disk.powerOn }}</td>
+                <td>
+                  <div class="server-disk-table-stack">
+                    <span>{{ t('overview.serverStatusErrors') }} {{ disk.mediaErrors }}</span>
+                    <small>{{ t('overview.serverStatusUnsafeShort', { value: disk.unsafe }) }}</small>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Dialog>
+
     <div
       class="detail-overlay"
       :class="{ open: detailOpen, modal: detailLayout === 'modal' }"
@@ -702,8 +912,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import Dialog from 'primevue/dialog';
 import type { EChartsType } from 'echarts/core';
 import {
   fetchBrowserStats,
@@ -713,13 +924,14 @@ import {
   fetchOSStats,
   fetchOverallStats,
   fetchRefererStats,
+  fetchServerStatus,
   fetchSessions,
   fetchTimeSeriesStats,
   fetchUrlStats,
   fetchWebsites,
 } from '@/api';
-import type { SimpleSeriesStats, TimeSeriesStats, WebsiteInfo } from '@/api/types';
-import { formatTraffic, getUserPreference, saveUserPreference } from '@/utils';
+import type { ServerDiskStatus, ServerStatusResponse, SimpleSeriesStats, TimeSeriesStats, WebsiteInfo } from '@/api/types';
+import { formatTraffic, getInitialServerStatusEnabled, getUserPreference, saveUserPreference } from '@/utils';
 import { Chart } from '@/utils/chartjs';
 import ParsingOverlay from '@/components/ParsingOverlay.vue';
 import HeaderToolbar from '@/components/HeaderToolbar.vue';
@@ -744,6 +956,7 @@ type ThemeContext = {
 };
 
 type EChartsCore = typeof import('echarts/core');
+type ServerDiskSortKey = 'risk' | 'temperature' | 'capacity' | 'name';
 
 let echartsCore: EChartsCore | null = null;
 let geoMapRuntimePromise: Promise<EChartsCore> | null = null;
@@ -781,6 +994,13 @@ const osStats = ref<SimpleSeriesStats | null>(null);
 const deviceStats = ref<SimpleSeriesStats | null>(null);
 const geoData = ref<Array<{ name: string; value: number; percentage: number }>>([]);
 const geoPending = ref(false);
+const bootServerStatusEnabled = getInitialServerStatusEnabled();
+const serverStatus = ref<ServerStatusResponse | null>(readCachedServerStatus(bootServerStatusEnabled));
+const initialServerStatusEnabled = ref<boolean | null>(bootServerStatusEnabled ?? (serverStatus.value?.enabled ? true : null));
+const serverStatusLoading = ref(false);
+const serverStatusError = ref('');
+const serverDiskDialogVisible = ref(false);
+const serverDiskSortKey = ref<ServerDiskSortKey>('risk');
 
 const visitsChartRef = ref<HTMLCanvasElement | null>(null);
 const newOldChartRef = ref<HTMLCanvasElement | null>(null);
@@ -796,10 +1016,12 @@ let overviewRequestId = 0;
 let chartRequestId = 0;
 let mapRequestId = 0;
 let autoRefreshTimer: number | null = null;
+let serverStatusTimer: number | null = null;
 
 const DETAIL_LIMIT = 50;
 const DETAIL_LOG_PAGE_SIZE = 30;
 const AUTO_REFRESH_INTERVAL = 3000;
+const SERVER_STATUS_CACHE_KEY = 'nginxpulse:serverStatusSnapshot';
 
 const dateRangeOptions = computed(() => [
   { value: 'today', label: t('common.today') },
@@ -989,6 +1211,213 @@ const hasVisitsTrendData = computed(() => hasTimeSeriesData(timeSeriesData.value
 const hasNewOldData = computed(() => newOldStats.value.newCount + newOldStats.value.oldCount > 0);
 const hasGeoData = computed(() => geoRows.value.length > 0);
 const hasDeviceData = computed(() => deviceTotals.value.desktop + deviceTotals.value.mobile + deviceTotals.value.other > 0);
+const serverStatusVisible = computed(() => {
+  if (serverStatus.value) {
+    return Boolean(serverStatus.value.enabled);
+  }
+  return initialServerStatusEnabled.value === true;
+});
+const serverDisks = computed(() => serverStatus.value?.disks || []);
+const riskSortedServerDisks = computed(() =>
+  [...serverDisks.value].sort((a, b) => diskRiskScore(b) - diskRiskScore(a))
+);
+const primaryServerDisk = computed(() => riskSortedServerDisks.value[0] || null);
+const hottestServerDisk = computed(() =>
+  [...serverDisks.value].sort((a, b) => (numberValue(b.temperature_celsius) ?? -1) - (numberValue(a.temperature_celsius) ?? -1))[0] || null
+);
+const serverDiskSummaryText = computed(() => {
+  const count = serverStatus.value?.disk_count ?? serverDisks.value.length;
+  const worst = primaryServerDisk.value;
+  if (!worst) {
+    return t('overview.serverStatusDiskCount', { value: count });
+  }
+  const diskName = worst.model || worst.name || t('overview.serverStatusDiskFallback');
+  if (count <= 1) {
+    return t('overview.serverStatusDiskSingleSummary', {
+      count,
+      disk: diskName,
+    });
+  }
+  if (serverDisks.value.every((disk) => diskTone(disk) === 'good')) {
+    return t('overview.serverStatusDiskAllHealthySummary', { count });
+  }
+  return t('overview.serverStatusDiskAttentionSummary', {
+    count,
+    disk: diskName,
+  });
+});
+const serverDiskActionText = computed(() => {
+  if (serverDisks.value.length <= 1) {
+    return t('overview.serverStatusViewDiskDetail');
+  }
+  return t('overview.serverStatusViewAllDisks', { count: serverDisks.value.length });
+});
+const serverDiskSummaryStats = computed(() => {
+  const disk = primaryServerDisk.value;
+  if (!disk) {
+    return [];
+  }
+  return [
+    {
+      key: 'temp',
+      label: t('overview.serverStatusDiskColTemp'),
+      value: formatTemperature(numberValue(disk.temperature_celsius)),
+    },
+    {
+      key: 'health',
+      label: t('overview.serverStatusDiskColHealth'),
+      value: formatDiskHealth(disk),
+    },
+    {
+      key: 'written',
+      label: t('overview.serverStatusWritten'),
+      value: formatOptionalTraffic(disk.data_units_written_bytes),
+    },
+  ];
+});
+const serverDiskDialogSummary = computed(() => {
+  const riskyCount = serverDisks.value.filter((disk) => diskTone(disk) !== 'good').length;
+  return t('overview.serverStatusAllDisksSummary', {
+    count: serverDisks.value.length,
+    risky: riskyCount,
+  });
+});
+const serverDiskSortOptions = computed<Array<{ label: string; value: ServerDiskSortKey }>>(() => [
+  { label: t('overview.serverStatusDiskSortRisk'), value: 'risk' },
+  { label: t('overview.serverStatusDiskSortTemp'), value: 'temperature' },
+  { label: t('overview.serverStatusDiskSortCapacity'), value: 'capacity' },
+  { label: t('overview.serverStatusDiskSortName'), value: 'name' },
+]);
+const serverDiskDialogRows = computed(() =>
+  sortServerDisks(serverDisks.value, serverDiskSortKey.value).map((disk, index) => ({
+    key: `${disk.path || disk.name || disk.model || 'disk'}-${index}`,
+    tone: diskTone(disk),
+    icon: diskTone(disk) === 'danger'
+      ? 'ri-error-warning-line'
+      : diskTone(disk) === 'warn'
+        ? 'ri-alert-line'
+        : 'ri-checkbox-circle-line',
+    status: formatDiskStatus(disk),
+    model: disk.model || disk.name || t('overview.serverStatusDiskFallback'),
+    path: disk.path || disk.smartctl_path || disk.name || t('common.none'),
+    type: disk.type ? String(disk.type).toUpperCase() : t('common.none'),
+    capacity: disk.size_bytes ? formatOptionalTraffic(disk.size_bytes) : t('common.none'),
+    temperature: formatTemperature(numberValue(disk.temperature_celsius)),
+    health: formatDiskHealth(disk),
+    written: formatOptionalTraffic(disk.data_units_written_bytes),
+    read: formatOptionalTraffic(disk.data_units_read_bytes),
+    powerOn: formatServerHours(disk.power_on_hours),
+    mediaErrors: formatCount(Number(disk.media_errors ?? 0)),
+    unsafe: formatCount(Number(disk.unsafe_shutdowns ?? 0)),
+  }))
+);
+const serverStatusClass = computed(() => `is-${serverStatus.value?.status || 'ok'}`);
+const serverStatusLabel = computed(() => {
+  switch (serverStatus.value?.status) {
+    case 'ok':
+      return t('overview.serverStatusOk');
+    case 'warning':
+      return t('overview.serverStatusWarning');
+    case 'partial':
+      return t('overview.serverStatusPartial');
+    case 'error':
+      return t('overview.serverStatusErrorState');
+    default:
+      return t('common.none');
+  }
+});
+const serverStatusUpdatedAt = computed(() => formatServerStatusTime(serverStatus.value?.updated_at));
+const serverHealthScore = computed(() => {
+  const metrics = serverStatus.value?.metrics || {};
+  const disks = serverDisks.value;
+  const cpuTemp = metricNumber(metrics, 'cpu_temp_celsius');
+  const diskTemp = maxDiskTemperature(disks);
+  const nvmeTemp = Math.max(
+    metricNumber(metrics, 'nvme_temp_celsius') ?? 0,
+    diskTemp ?? 0
+  ) || null;
+  const diskRemaining = minDiskRemaining(disks);
+  const mediaErrors = disks.reduce((total, disk) => total + Number(disk.media_errors || 0), 0);
+  let score = diskRemaining ?? 100;
+  if (disks.some((disk) => disk.health_passed === false)) {
+    score = Math.min(score, 35);
+  }
+  if ((serverStatus.value?.errors || []).length > 0) {
+    score -= 15;
+  }
+  score -= temperaturePenalty(cpuTemp);
+  score -= temperaturePenalty(nvmeTemp);
+  score -= Math.min(25, mediaErrors * 4);
+  return clampNumber(Math.round(score), 0, 100);
+});
+const serverHealthTone = computed(() => {
+  if (serverHealthScore.value < 50 || serverStatus.value?.status === 'error') {
+    return 'danger';
+  }
+  if (serverHealthScore.value < 80 || ['warning', 'partial'].includes(serverStatus.value?.status || '')) {
+    return 'warn';
+  }
+  return 'good';
+});
+const serverStatusSensorRows = computed(() => {
+  const metrics = serverStatus.value?.metrics || {};
+  const cpuFan = metricNumber(metrics, 'cpu_fan_rpm');
+  const chassisFan = metricNumber(metrics, 'chassis_fan1_rpm');
+  const fanLoad = maxMetricNumber(cpuFan, chassisFan);
+  const diskTemp = maxDiskTemperature(serverDisks.value);
+  const nvmeTemp = Math.max(metricNumber(metrics, 'nvme_temp_celsius') ?? 0, diskTemp ?? 0) || null;
+  const hottestDisk = hottestServerDisk.value;
+  return [
+    {
+      key: 'cpu-temp',
+      icon: 'ri-cpu-line',
+      label: t('overview.serverStatusCpuTemp'),
+      value: formatTemperature(metricNumber(metrics, 'cpu_temp_celsius')),
+      sub: t('overview.serverStatusNormalRange'),
+      tone: temperatureTone(metricNumber(metrics, 'cpu_temp_celsius')),
+      style: sensorStyle(temperaturePercent(metricNumber(metrics, 'cpu_temp_celsius'))),
+    },
+    {
+      key: 'board-temp',
+      icon: 'ri-dashboard-3-line',
+      label: t('overview.serverStatusBoardTempLabel'),
+      value: formatTemperature(metricNumber(metrics, 'board_temp_celsius')),
+      sub: t('overview.serverStatusBoardTempHint'),
+      tone: temperatureTone(metricNumber(metrics, 'board_temp_celsius')),
+      style: sensorStyle(temperaturePercent(metricNumber(metrics, 'board_temp_celsius'))),
+    },
+    {
+      key: 'nvme-temp',
+      icon: 'ri-hard-drive-3-line',
+      label: t('overview.serverStatusNvmeTemp'),
+      value: formatTemperature(nvmeTemp),
+      sub: hottestDisk
+        ? t('overview.serverStatusHottestDisk', { disk: hottestDisk.name || hottestDisk.model || t('overview.serverStatusDiskFallback') })
+        : t('overview.serverStatusDiskCount', { value: serverStatus.value?.disk_count ?? serverStatus.value?.disks?.length ?? 0 }),
+      tone: temperatureTone(nvmeTemp),
+      style: sensorStyle(temperaturePercent(nvmeTemp)),
+    },
+    {
+      key: 'cpu-fan',
+      icon: 'ri-fan-line',
+      label: t('overview.serverStatusFanSpeed'),
+      value: '',
+      cpuValue: formatFanRPMValue(cpuFan),
+      chassisValue: formatFanRPMValue(chassisFan),
+      sub: '',
+      tone: 'neutral',
+      style: fanSensorStyle(cpuFan ?? chassisFan, fanLoad),
+    },
+  ];
+});
+const serverStatusMessages = computed(() => {
+  const messages = [...(serverStatus.value?.errors || [])];
+  const missing = serverStatus.value?.missing_metrics || [];
+  if (missing.length > 0) {
+    messages.push(t('overview.serverStatusMissingMetrics', { value: missing.join(', ') }));
+  }
+  return messages;
+});
 
 const dailyViewDisabled = computed(() => ['today', 'yesterday'].includes(dateRange.value) || isSpecificDateValue(dateRange.value));
 
@@ -1314,12 +1743,14 @@ const DETAIL_FILTER_LAYOUTS = computed(() => ({
 
 onMounted(() => {
   loadWebsites();
+  loadServerStatus();
   initGeoMap();
   restartAutoRefresh();
 });
 
 onBeforeUnmount(() => {
   stopAutoRefresh();
+  stopServerStatusRefresh();
   if (visitsChart) {
     visitsChart.destroy();
     visitsChart = null;
@@ -1487,6 +1918,77 @@ async function refreshOverview(silent = false) {
   }
 }
 
+async function loadServerStatus() {
+  if (serverStatusLoading.value) {
+    return;
+  }
+  serverStatusLoading.value = true;
+  try {
+    const data = await fetchServerStatus();
+    serverStatus.value = data;
+    initialServerStatusEnabled.value = data.enabled;
+    serverStatusError.value = '';
+    persistServerStatus(data);
+    scheduleServerStatusRefresh(data);
+  } catch (error) {
+    console.error('加载服务器状态失败:', error);
+    serverStatusError.value = serverStatus.value ? '' : t('overview.serverStatusLoadError');
+    scheduleServerStatusRefresh(serverStatus.value);
+  } finally {
+    serverStatusLoading.value = false;
+  }
+}
+
+function readCachedServerStatus(initialEnabled: boolean | null): ServerStatusResponse | null {
+  if (initialEnabled === false || typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(SERVER_STATUS_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const data = JSON.parse(raw) as ServerStatusResponse;
+    return data?.enabled ? data : null;
+  } catch {
+    window.localStorage.removeItem(SERVER_STATUS_CACHE_KEY);
+    return null;
+  }
+}
+
+function persistServerStatus(data: ServerStatusResponse) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (!data.enabled) {
+    window.localStorage.removeItem(SERVER_STATUS_CACHE_KEY);
+    return;
+  }
+  window.localStorage.setItem(SERVER_STATUS_CACHE_KEY, JSON.stringify(data));
+}
+
+function scheduleServerStatusRefresh(data: ServerStatusResponse | null) {
+  stopServerStatusRefresh();
+  if (!data?.enabled) {
+    return;
+  }
+  const seconds = Math.max(5, Number(data.refresh_interval_seconds || 30));
+  serverStatusTimer = window.setInterval(() => {
+    if (document.visibilityState !== 'visible' || serverStatusLoading.value) {
+      return;
+    }
+    loadServerStatus();
+  }, seconds * 1000);
+}
+
+function stopServerStatusRefresh() {
+  if (!serverStatusTimer) {
+    return;
+  }
+  window.clearInterval(serverStatusTimer);
+  serverStatusTimer = null;
+}
+
 function startAutoRefresh() {
   if (autoRefreshTimer) {
     return;
@@ -1545,7 +2047,7 @@ async function loadTimeSeries() {
 }
 
 async function loadGeoMap() {
-  if (!currentWebsiteId.value || !geoMapChart) {
+  if (!currentWebsiteId.value) {
     return;
   }
 
@@ -1578,7 +2080,12 @@ async function loadGeoMap() {
         ? rows.map((row) => ({ ...row, name: normalizeChinaRegionName(row.name) }))
         : rows.map((row) => ({ ...row, name: normalizeWorldRegionName(row.name) }));
 
-    geoData.value = normalizedRows.filter((row) => !isExcludedGeoName(row.name));
+    const nextGeoData = normalizedRows.filter((row) => !isExcludedGeoName(row.name));
+    geoData.value = nextGeoData;
+    if (nextGeoData.length > 0) {
+      await nextTick();
+      await initGeoMap();
+    }
     renderGeoMap(geoData.value);
   } catch (error: any) {
     if (error?.name === 'AbortError') {
@@ -2652,6 +3159,250 @@ function formatCount(value: number | null | undefined) {
     return t('common.none');
   }
   return n(Number(value));
+}
+
+function numberValue(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function metricNumber(metrics: Record<string, unknown>, key: string): number | null {
+  return numberValue(metrics[key]);
+}
+
+function maxMetricNumber(...values: Array<number | null | undefined>) {
+  const finiteValues = values.filter((value): value is number => Number.isFinite(value));
+  if (finiteValues.length === 0) {
+    return null;
+  }
+  return Math.max(...finiteValues);
+}
+
+function minDiskRemaining(disks: ServerDiskStatus[]) {
+  const values = disks
+    .map((disk) => numberValue(disk.percentage_remaining))
+    .filter((value): value is number => value !== null);
+  if (values.length === 0) {
+    return null;
+  }
+  return Math.min(...values);
+}
+
+function maxDiskTemperature(disks: ServerDiskStatus[]) {
+  const values = disks
+    .map((disk) => numberValue(disk.temperature_celsius))
+    .filter((value): value is number => value !== null);
+  if (values.length === 0) {
+    return null;
+  }
+  return Math.max(...values);
+}
+
+function diskRiskScore(disk: ServerDiskStatus) {
+  const remaining = numberValue(disk.percentage_remaining);
+  const temp = numberValue(disk.temperature_celsius);
+  let score = 0;
+  if (disk.health_passed === false) {
+    score += 1000;
+  }
+  if (remaining !== null) {
+    score += Math.max(0, 100 - remaining) * 5;
+  }
+  if (temp !== null) {
+    score += Math.max(0, temp - 45) * 4;
+  }
+  score += Number(disk.media_errors || 0) * 20;
+  score += Number(disk.error_log_entries || 0) * 3;
+  score += Number(disk.unsafe_shutdowns || 0);
+  return score;
+}
+
+function diskTone(disk: ServerDiskStatus) {
+  const remaining = numberValue(disk.percentage_remaining);
+  const temp = numberValue(disk.temperature_celsius);
+  if (disk.health_passed === false || (remaining !== null && remaining < 20) || Number(disk.media_errors || 0) > 0) {
+    return 'danger';
+  }
+  if ((remaining !== null && remaining < 60) || (temp !== null && temp >= 55) || Number(disk.error_log_entries || 0) > 0) {
+    return 'warn';
+  }
+  return 'good';
+}
+
+function formatDiskStatus(disk: ServerDiskStatus) {
+  const tone = diskTone(disk);
+  if (tone === 'danger') {
+    return t('overview.serverStatusDiskToneDanger');
+  }
+  if (tone === 'warn') {
+    return t('overview.serverStatusDiskToneWarn');
+  }
+  return t('overview.serverStatusDiskToneGood');
+}
+
+function formatDiskHealth(disk: ServerDiskStatus) {
+  const remaining = numberValue(disk.percentage_remaining);
+  if (remaining !== null) {
+    return `${remaining}%`;
+  }
+  if (disk.health_passed === true) {
+    return t('overview.serverStatusHealthPassed');
+  }
+  if (disk.health_passed === false) {
+    return t('overview.serverStatusErrorState');
+  }
+  return t('common.none');
+}
+
+function formatDiskSubText(disk: ServerDiskStatus) {
+  const parts = [
+    disk.type ? String(disk.type).toUpperCase() : '',
+    disk.size_bytes ? formatOptionalTraffic(disk.size_bytes) : '',
+    disk.path || '',
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function sortServerDisks(disks: ServerDiskStatus[], sortKey: ServerDiskSortKey) {
+  return [...disks].sort((a, b) => {
+    if (sortKey === 'temperature') {
+      return compareNumbersDesc(numberValue(b.temperature_celsius), numberValue(a.temperature_celsius)) || diskRiskScore(b) - diskRiskScore(a);
+    }
+    if (sortKey === 'capacity') {
+      return compareNumbersDesc(numberValue(b.size_bytes), numberValue(a.size_bytes)) || diskRiskScore(b) - diskRiskScore(a);
+    }
+    if (sortKey === 'name') {
+      return diskDisplayName(a).localeCompare(diskDisplayName(b), currentLocale.value);
+    }
+    return diskRiskScore(b) - diskRiskScore(a);
+  });
+}
+
+function compareNumbersDesc(left: number | null, right: number | null) {
+  const safeLeft = left ?? Number.NEGATIVE_INFINITY;
+  const safeRight = right ?? Number.NEGATIVE_INFINITY;
+  return safeLeft - safeRight;
+}
+
+function diskDisplayName(disk: ServerDiskStatus) {
+  return disk.model || disk.name || disk.path || '';
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function temperaturePenalty(value: number | null | undefined) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  if (Number(value) >= 85) {
+    return 30;
+  }
+  if (Number(value) >= 75) {
+    return 20;
+  }
+  if (Number(value) >= 65) {
+    return 10;
+  }
+  return 0;
+}
+
+function formatTemperature(value: number | null | undefined) {
+  if (!Number.isFinite(value)) {
+    return t('common.none');
+  }
+  return `${Number(value).toFixed(1)}°C`;
+}
+
+function formatRPM(value: number | null | undefined) {
+  if (!Number.isFinite(value)) {
+    return t('common.none');
+  }
+  return `${Math.round(Number(value))} RPM`;
+}
+
+function formatFanRPMValue(value: number | null | undefined) {
+  if (!Number.isFinite(value)) {
+    return t('common.none');
+  }
+  return n(Math.round(Number(value)));
+}
+
+function formatOptionalTraffic(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return t('common.none');
+  }
+  return formatTraffic(parsed);
+}
+
+function formatServerHours(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return t('common.none');
+  }
+  return t('overview.serverStatusHours', { value: n(Math.round(parsed)) });
+}
+
+function temperatureTone(value: number | null | undefined) {
+  if (!Number.isFinite(value)) {
+    return 'neutral';
+  }
+  if (Number(value) >= 75) {
+    return 'danger';
+  }
+  if (Number(value) >= 60) {
+    return 'warn';
+  }
+  return 'good';
+}
+
+function temperaturePercent(value: number | null | undefined) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return clampNumber((Number(value) / 90) * 100, 6, 100);
+}
+
+function fanPercent(value: number | null | undefined) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return clampNumber((Number(value) / 1800) * 100, 8, 100);
+}
+
+function sensorStyle(percent: number) {
+  return {
+    '--sensor-percent': `${clampNumber(percent, 0, 100)}%`,
+  };
+}
+
+function fanSensorStyle(value: number | null | undefined, loadValue: number | null | undefined = value) {
+  const rpm = Number(value);
+  const duration = Number.isFinite(rpm) && rpm > 0
+    ? clampNumber(1200 / rpm, 0.65, 2.4)
+    : 2.4;
+  return {
+    ...sensorStyle(fanPercent(loadValue)),
+    '--fan-duration': `${duration.toFixed(2)}s`,
+  };
+}
+
+function formatServerStatusTime(value: string | undefined) {
+  if (!value) {
+    return '';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString(currentLocale.value === 'zh-CN' ? 'zh-CN' : 'en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function formatDurationSeconds(seconds: number) {

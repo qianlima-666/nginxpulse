@@ -15,6 +15,7 @@ import type {
   AlertPushTestResponse,
   DeveloperDailyStats,
   RefererIPBatchStats,
+  ServerStatusResponse,
   SimpleSeriesStats,
   SystemNotificationListResponse,
   TimeSeriesStats,
@@ -50,6 +51,11 @@ export const fetchAppStatus = async (): Promise<AppStatusResponse> => {
 
 export const fetchVersionInfo = async (): Promise<VersionInfoResponse> => {
   const response = await client.get<ApiResponse<VersionInfoResponse>>('api/version');
+  return response.data;
+};
+
+export const fetchServerStatus = async (): Promise<ServerStatusResponse> => {
+  const response = await client.get<ApiResponse<ServerStatusResponse>>('api/server-status');
   return response.data;
 };
 

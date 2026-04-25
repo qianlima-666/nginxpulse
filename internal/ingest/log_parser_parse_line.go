@@ -702,6 +702,13 @@ func parseLogTime(raw, layout string) (time.Time, error) {
 	layouts := make([]string, 0, 3)
 	if layout != "" {
 		layouts = append(layouts, layout)
+		if layout == defaultZoraxyTimeLayout {
+			layouts = append(layouts,
+				"2006-01-02 15:04:05",
+				"2006-01-02 15:04:05.000",
+				"2006-01-02 15:04:05.000000000",
+			)
+		}
 	}
 	layouts = append(layouts, defaultNginxTimeLayout, time.RFC3339, time.RFC3339Nano)
 

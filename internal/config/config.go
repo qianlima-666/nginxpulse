@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -32,15 +33,16 @@ type Config struct {
 }
 
 type WebsiteConfig struct {
-	Name       string           `json:"name"`
-	LogPath    string           `json:"logPath"`
-	Domains    []string         `json:"domains,omitempty"`
-	LogType    string           `json:"logType,omitempty"`
-	LogFormat  string           `json:"logFormat,omitempty"`
-	LogRegex   string           `json:"logRegex,omitempty"`
-	TimeLayout string           `json:"timeLayout,omitempty"`
-	Sources    []SourceConfig   `json:"sources,omitempty"`
-	Whitelist  *WhitelistConfig `json:"whitelist,omitempty"`
+	Name              string           `json:"name"`
+	LogPath           string           `json:"logPath"`
+	Domains           []string         `json:"domains,omitempty"`
+	LogType           string           `json:"logType,omitempty"`
+	LogFormat         string           `json:"logFormat,omitempty"`
+	LogRegex          string           `json:"logRegex,omitempty"`
+	TimeLayout        string           `json:"timeLayout,omitempty"`
+	Sources           []SourceConfig   `json:"sources,omitempty"`
+	Whitelist         *WhitelistConfig `json:"whitelist,omitempty"`
+	AutoDiscoverHosts bool             `json:"autoDiscoverHosts,omitempty"`
 }
 
 type SourceConfig struct {
@@ -96,22 +98,32 @@ type WhitelistConfig struct {
 }
 
 type SystemConfig struct {
-	LogDestination            string           `json:"logDestination"`
-	TaskInterval              string           `json:"taskInterval"` // "5m" "25s"
-	BackfillMaxDurationPerRun string           `json:"backfillMaxDurationPerRun,omitempty"`
-	BackfillMaxBytesPerRun    int64            `json:"backfillMaxBytesPerRun,omitempty"`
-	HTTPSourceTimeout         string           `json:"httpSourceTimeout,omitempty"`
-	LogRetentionDays          int              `json:"logRetentionDays"`
-	ParseBatchSize            int              `json:"parseBatchSize"`
-	IPGeoCacheLimit           int              `json:"ipGeoCacheLimit"`
-	IPGeoAPIURL               string           `json:"ipGeoApiUrl"`
-	AlertPush                 *AlertPushConfig `json:"alertPush,omitempty"`
-	DemoMode                  bool             `json:"demoMode"`
-	AccessKeys                []string         `json:"accessKeys"`
-	AccessKeyExpireDays       int              `json:"accessKeyExpireDays"`
-	Language                  string           `json:"language"`
-	WebBasePath               string           `json:"webBasePath,omitempty"`
-	MobilePWAEnabled          bool             `json:"mobilePwaEnabled"`
+	LogDestination            string             `json:"logDestination"`
+	TaskInterval              string             `json:"taskInterval"` // "5m" "25s"
+	BackfillMaxDurationPerRun string             `json:"backfillMaxDurationPerRun,omitempty"`
+	BackfillMaxBytesPerRun    int64              `json:"backfillMaxBytesPerRun,omitempty"`
+	HTTPSourceTimeout         string             `json:"httpSourceTimeout,omitempty"`
+	LogRetentionDays          int                `json:"logRetentionDays"`
+	ParseBatchSize            int                `json:"parseBatchSize"`
+	IPGeoCacheLimit           int                `json:"ipGeoCacheLimit"`
+	IPGeoAPIURL               string             `json:"ipGeoApiUrl"`
+	AlertPush                 *AlertPushConfig   `json:"alertPush,omitempty"`
+	DemoMode                  bool               `json:"demoMode"`
+	AccessKeys                []string           `json:"accessKeys"`
+	AccessKeyExpireDays       int                `json:"accessKeyExpireDays"`
+	Language                  string             `json:"language"`
+	WebBasePath               string             `json:"webBasePath,omitempty"`
+	MobilePWAEnabled          bool               `json:"mobilePwaEnabled"`
+	ServerStatus              ServerStatusConfig `json:"serverStatus,omitempty"`
+}
+
+type ServerStatusConfig struct {
+	Enabled         bool   `json:"enabled"`
+	MockEnabled     bool   `json:"mockEnabled,omitempty"`
+	MetricsURL      string `json:"metricsUrl,omitempty"`
+	DisksURL        string `json:"disksUrl,omitempty"`
+	Timeout         string `json:"timeout,omitempty"`
+	RefreshInterval string `json:"refreshInterval,omitempty"`
 }
 
 type AlertPushConfig struct {
@@ -202,10 +214,136 @@ func GetWebsiteByID(id string) (WebsiteConfig, bool) {
 func GetAllWebsiteIDs() []string {
 	var ids []string
 	websiteIDMap.Range(func(key, value interface{}) bool {
+		if website, ok := value.(WebsiteConfig); ok && website.AutoDiscoverHosts {
+			return true
+		}
 		ids = append(ids, key.(string))
 		return true
 	})
 	return ids
+}
+
+func GetAutoDiscoverWebsiteTemplates() []WebsiteConfig {
+	cfg := ReadConfig()
+	templates := make([]WebsiteConfig, 0)
+	for _, website := range cfg.Websites {
+		if website.AutoDiscoverHosts {
+			templates = append(templates, website)
+		}
+	}
+	return templates
+}
+
+func RegisterRuntimeWebsite(website WebsiteConfig) (string, bool) {
+	cfg := ReadConfig()
+	website.AutoDiscoverHosts = false
+	website.Name = strings.TrimSpace(website.Name)
+	if website.Name == "" {
+		return "", false
+	}
+	if len(website.Domains) == 0 {
+		website.Domains = []string{website.Name}
+	}
+
+	if id, ok := findWebsiteIDByNameOrDomain(website.Name, website.Domains); ok {
+		return id, false
+	}
+
+	baseID := generateID(website.Name)
+	id := baseID
+	for i := 1; ; i++ {
+		if _, exists := websiteIDMap.Load(id); !exists {
+			break
+		}
+		id = fmt.Sprintf("%s_%d", baseID, i)
+	}
+
+	websiteIDMap.Store(id, website)
+	globalConfig = cfg
+	globalConfig.Websites = append(globalConfig.Websites, website)
+	return id, true
+}
+
+func UnregisterRuntimeWebsite(id string) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+	value, ok := websiteIDMap.Load(id)
+	if !ok {
+		return
+	}
+	target, ok := value.(WebsiteConfig)
+	if !ok {
+		websiteIDMap.Delete(id)
+		return
+	}
+	websiteIDMap.Delete(id)
+	if globalConfig == nil {
+		return
+	}
+	websites := globalConfig.Websites[:0]
+	for _, website := range globalConfig.Websites {
+		if sameWebsiteIdentity(website, target) {
+			continue
+		}
+		websites = append(websites, website)
+	}
+	globalConfig.Websites = websites
+}
+
+func sameWebsiteIdentity(a, b WebsiteConfig) bool {
+	if normalizeDomainForConfig(a.Name) != normalizeDomainForConfig(b.Name) {
+		return false
+	}
+	if len(a.Domains) != len(b.Domains) {
+		return false
+	}
+	for i := range a.Domains {
+		if normalizeDomainForConfig(a.Domains[i]) != normalizeDomainForConfig(b.Domains[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func findWebsiteIDByNameOrDomain(name string, domains []string) (string, bool) {
+	normalizedName := normalizeDomainForConfig(name)
+	normalizedDomains := make(map[string]struct{}, len(domains))
+	for _, domain := range domains {
+		if normalized := normalizeDomainForConfig(domain); normalized != "" {
+			normalizedDomains[normalized] = struct{}{}
+		}
+	}
+
+	var foundID string
+	websiteIDMap.Range(func(key, value interface{}) bool {
+		website, ok := value.(WebsiteConfig)
+		if !ok {
+			return true
+		}
+		if website.AutoDiscoverHosts {
+			return true
+		}
+		if normalizeDomainForConfig(website.Name) == normalizedName {
+			foundID = key.(string)
+			return false
+		}
+		for _, domain := range website.Domains {
+			if _, ok := normalizedDomains[normalizeDomainForConfig(domain)]; ok {
+				foundID = key.(string)
+				return false
+			}
+		}
+		return true
+	})
+	return foundID, foundID != ""
+}
+
+func normalizeDomainForConfig(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	value = strings.TrimSuffix(value, ".")
+	return value
 }
 
 func GetIPGeoAPIURL() string {

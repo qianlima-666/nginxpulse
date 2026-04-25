@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -234,6 +235,37 @@ func ValidateConfig(cfg *Config, opts ValidateOptions) ValidationResult {
 			addError("system.httpSourceTimeout", "httpSourceTimeout 格式无效，示例：30s、2m")
 		} else if timeout <= 0 {
 			addError("system.httpSourceTimeout", "httpSourceTimeout 必须大于 0")
+		}
+	}
+	if cfg.System.ServerStatus.Enabled {
+		validateHTTPURL := func(field, label, value string) {
+			trimmed := strings.TrimSpace(value)
+			if trimmed == "" {
+				addError(field, label+"不能为空")
+				return
+			}
+			parsed, err := url.Parse(trimmed)
+			if err != nil || parsed.Host == "" {
+				addError(field, label+"格式无效")
+				return
+			}
+			if parsed.Scheme != "http" && parsed.Scheme != "https" {
+				addError(field, label+"必须是 http(s) 地址")
+			}
+		}
+		if !cfg.System.ServerStatus.MockEnabled {
+			validateHTTPURL("system.serverStatus.metricsUrl", "服务器状态接口", cfg.System.ServerStatus.MetricsURL)
+			validateHTTPURL("system.serverStatus.disksUrl", "磁盘状态接口", cfg.System.ServerStatus.DisksURL)
+		}
+		if timeout, err := time.ParseDuration(strings.TrimSpace(cfg.System.ServerStatus.Timeout)); err != nil {
+			addError("system.serverStatus.timeout", "serverStatus.timeout 格式无效，示例：5s、10s")
+		} else if timeout <= 0 {
+			addError("system.serverStatus.timeout", "serverStatus.timeout 必须大于 0")
+		}
+		if interval, err := time.ParseDuration(strings.TrimSpace(cfg.System.ServerStatus.RefreshInterval)); err != nil {
+			addError("system.serverStatus.refreshInterval", "serverStatus.refreshInterval 格式无效，示例：30s、1m")
+		} else if interval <= 0 {
+			addError("system.serverStatus.refreshInterval", "serverStatus.refreshInterval 必须大于 0")
 		}
 	}
 	if basePath := NormalizeWebBasePath(cfg.System.WebBasePath); basePath != "" {

@@ -1,11 +1,15 @@
 # Configuration
 
-## Config location
-- Default: `configs/nginxpulse_config.json`
-- Dev: `scripts/dev_local.sh` uses `configs/nginxpulse_config.dev.json`
-- Env: `CONFIG_JSON` or `WEBSITES`
+This page focuses on getting NginxPulse configured quickly. Full field details, log sources, and log format examples are split into dedicated pages to keep this entry point lightweight.
 
-## Full example (copy & edit)
+## Config Location
+- Default config: `configs/nginxpulse_config.json`
+- Local development: `scripts/dev_local.sh` uses `configs/nginxpulse_config.dev.json`
+- Environment injection: `CONFIG_JSON` or `WEBSITES`
+
+## Minimal Config
+If the log file and PostgreSQL are reachable, start with this:
+
 ```json
 {
   "websites": [
@@ -13,350 +17,190 @@
       "name": "Main Site",
       "logPath": "/var/log/nginx/access.log",
       "domains": ["example.com", "www.example.com"],
-      "logType": "nginx",
-      "logFormat": "",
-      "logRegex": "",
-      "timeLayout": ""
+      "logType": "nginx"
     }
   ],
-  "system": {
-    "logDestination": "file",
-    "taskInterval": "1m",
-    "logRetentionDays": 30,
-    "parseBatchSize": 100,
-    "ipGeoCacheLimit": 1000000,
-    "ipGeoApiUrl": "http://ip-api.com/batch",
-    "demoMode": false,
-    "accessKeys": [],
-    "language": "zh-CN",
-    "webBasePath": ""
-  },
   "database": {
     "driver": "postgres",
-    "dsn": "postgres://nginxpulse:nginxpulse@127.0.0.1:5432/nginxpulse?sslmode=disable",
-    "maxOpenConns": 10,
-    "maxIdleConns": 5,
-    "connMaxLifetime": "30m"
+    "dsn": "postgres://nginxpulse:nginxpulse@127.0.0.1:5432/nginxpulse?sslmode=disable"
   },
   "server": {
     "Port": ":8089"
-  },
-  "pvFilter": {
-    "statusCodeInclude": [200],
-    "excludePatterns": [
-      "favicon.ico$",
-      "robots.txt$",
-      "sitemap.xml$",
-      "^/health$",
-      "^/_(?:nuxt|next)/",
-      "rss.xml$",
-      "feed.xml$",
-      "atom.xml$"
-    ],
-    "excludeIPs": ["127.0.0.1", "::1"]
   }
 }
 ```
 
-## Must-edit fields after copy
-- `websites[].name`: your site name (defines site ID).
-- `websites[].logPath` or `websites[].sources`: log source.
-- `websites[].domains`: your domains (recommended).
-- `database.dsn`: PostgreSQL DSN.
+## Fields You Usually Need To Change
+- `websites[].name`: site name. It is used to derive the site ID; renaming creates a new site.
+- `websites[].logPath`: log path. For remote, multi-source, or Agent collection, see [Log Sources](Log-Sources-EN).
+- `websites[].domains`: domain list. Recommended for same-site referer detection.
+- `websites[].logType`: log type. Supported values and samples are in [Supported Log Formats](Supported-Log-Formats-EN).
+- `websites[].autoDiscoverHosts`: use this entry as a discovery template and generate real sites from parsed `host` values.
+- `database.dsn`: PostgreSQL connection string.
+- `server.Port`: Web/API listen port. `:8089` is the common default.
 
-## Field reference
+## Common Scenarios
 
-### system runtime parameters
-- `webBasePath` (string): Frontend base path (single segment only).
-  - Example: `nginxpulse` → `/nginxpulse/`, mobile `/nginxpulse/m/`, API `/nginxpulse/api/`
-  - Empty means root path `/`
-  - Requires restart to take effect
-  - Root path `/` is disabled once set
-
-**Design principles**
-1. **Runtime configurable**: `window.__NGINXPULSE_BASE_PATH__` is delivered via `/app-config.js`, so frontend routing and API base are resolved at runtime without rebuilding.
-2. **Prefix isolation**: server middleware strips the `/<base>` prefix and rejects root-path requests; API is only available at `/<base>/api/*`.
-3. **Static asset compatibility**: `/app-config.js` and assets are kept accessible so the frontend can boot correctly.
-
-### Mobile Bottom Navigation (URL override)
-On mobile (`/m/`), you can temporarily override navigation position via URL query parameters. This is useful for debugging, demos, or A/B checks:
-
-- Priority: `tabbarBottom` overrides `tabbar`.
-- Truthy values (bottom tabbar): `1`, `true`, `yes`, `on`, `bottom`.
-- Falsy values (top navigation): `0`, `false`, `no`, `off`, `top`.
-- When one of these URL params is present, the choice is persisted to local storage and remains effective across in-app navigation.
-- Without parameters, default behavior applies (PWA defaults to bottom tabbar; non-PWA follows frontend default config).
-
-Examples:
-```bash
-# force top navigation.
-https://example.com/m/?tabbarBottom=true
-# force bottom tabbar.
-https://example.com/m/?tabbarBottom=false
-```
-
-### websites[]
-- `name` (string, required): site name. ID is derived from this.
-- `logPath` (string, required): log path, supports `*` glob.
-- `domains` (string[]): domain list. This field is used by the system to determine whether traffic is internal (same-site access).
-- `logType` (string): `nginx`, `caddy`, `nginx-proxy-manager` (`npm`), `apache` (`httpd`), `iis` (`iis-w3c`), `haproxy`, `traefik`, `envoy`, `tengine`, `nginx-ingress` (`ingress-nginx`), `traefik-ingress`, `haproxy-ingress`, or `safeline` (`safeline-waf`/`raywaf`/`ray-waf`/`leichi`/`leichi-waf`), default `nginx`.
-- `logFormat` (string): custom format with `$vars`.
-- `logRegex` (string): custom regex with named groups.
-- `timeLayout` (string): custom time layout.
-- `sources` (array): multi-source inputs (replaces `logPath`).
-
-### Log parsing fields
-Named fields needed by the parser (aliases allowed):
-- IP: `ip`, `remote_addr`, `client_ip`, `http_x_forwarded_for`
-- Time: `time`, `time_local`, `time_iso8601`
-- Method: `method`, `request_method`
-- URL: `url`, `request_uri`, `uri`, `path`
-- Status: `status`
-- Bytes: `bytes`, `body_bytes_sent`, `bytes_sent`
-- Referer: `referer`, `http_referer`
-- UA: `ua`, `user_agent`, `http_user_agent`
-
-Supported `logFormat` variables (common):
-- `$remote_addr`, `$http_x_forwarded_for`, `$remote_user`, `$remote_port`, `$connection`
-- `$time_local`, `$time_iso8601`
-- `$request`, `$request_method`, `$request_uri`, `$uri`, `$args`, `$query_string`, `$request_length`, `$request_time`, `$request_time_msec`, `$request_id`
-- `$host`, `$http_host`, `$server_name`, `$scheme`
-- `$status`, `$body_bytes_sent`, `$bytes_sent`
-- `$http_referer`, `$http_user_agent`
-- `$upstream_addr`, `$upstream_status`, `$upstream_response_time`, `$upstream_connect_time`, `$upstream_header_time`
-
-`logFormat` example:
-```json
-"logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\""
-```
-
-`logFormat` example (with proxy + upstream):
-```json
-"logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" \"$http_x_forwarded_for\" $host $scheme $request_length $remote_port $upstream_addr $upstream_status $upstream_response_time $upstream_connect_time $upstream_header_time"
-```
-
-#### Lightweight Trace Fields (duration / request size / upstream info)
-If you want NginxPulse to show these fields in the Logs page:
-- Request duration
-- Request size
-- Upstream duration
-- Upstream address
-- Host
-- Request ID
-
-your Nginx `access_log` must already include them. NginxPulse does **not** capture request bodies or response content by itself; it can only parse fields that already exist in the log.
-
-Minimum recommended variables:
-- `$request_time`: total request duration
-- `$request_length`: request size (request line + headers + body)
-- `$host`: request host
-
-If you use reverse proxy / upstream, also recommend:
-- `$upstream_response_time`: upstream response duration
-- `$upstream_addr`: upstream address
-- `$request_id`: unique request ID (if this variable is configured in your Nginx)
-
-Recommended `log_format`:
-```nginx
-log_format nginxpulse_trace '$remote_addr - $remote_user [$time_local] '
-                            '"$request" $status $body_bytes_sent '
-                            '"$http_referer" "$http_user_agent" '
-                            '$request_time $request_length '
-                            '$upstream_response_time $upstream_addr '
-                            '$host $request_id';
-```
-
-If you fill `websites[].logFormat` manually, keep it aligned with the same fields, for example:
-```json
-"logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $request_time $request_length $upstream_response_time $upstream_addr $host $request_id"
-```
-
-Notes:
-- `$request_time` is logged in seconds; NginxPulse converts it to milliseconds for display.
-- `$request_length` is the total request size, not just the raw request body.
-- If your logs do not contain these variables, the related columns will stay empty, but base analytics still work.
-- In most production setups, `request_body` and response content are **not** logged, and this is still the recommended approach.
-
-`logRegex` example:
-```json
-"logRegex": "^(?P<ip>\\S+) - (?P<user>\\S+) \\[(?P<time>[^\\]]+)\\] \"(?P<method>\\S+) (?P<url>[^\"]+) HTTP/\\d\\.\\d\" (?P<status>\\d+) (?P<bytes>\\d+) \"(?P<referer>[^\"]*)\" \"(?P<ua>[^\"]*)\"$"
-```
-
-### websites[].sources (optional)
-When `sources` exists, `logPath` is ignored.
-
-`sources` accepts a **JSON array**, where each item represents one log source. This design allows:
-1) Multiple sources per site (multi-host, multi-path, multi-bucket).
-2) Different parsing/auth/polling strategies per source for easy extension and rollout.
-3) Clean separation for rotation/archival inputs without modifying existing sources.
-
-Common fields:
-- `id` (string, required): unique ID.
-- `type` (string, required): `local` | `sftp` | `http` | `s3` | `agent`
-- `mode` (string): `poll` | `stream` | `hybrid`, default `poll`.
-- `pollInterval` (string): reserved, not used in current version.
-- `compression` (string): `gz` | `none` | `auto` (auto uses file extension).
-- `parse` (object): per-source overrides (logType/logFormat/logRegex/timeLayout).
-
-#### local source
-```json
-{
-  "id": "local-main",
-  "type": "local",
-  "path": "/var/log/nginx/access.log",
-  "pattern": "",
-  "compression": "auto"
-}
-```
-
-#### sftp source
-```json
-{
-  "id": "sftp-main",
-  "type": "sftp",
-  "host": "10.0.0.10",
-  "port": 22,
-  "user": "nginx",
-  "auth": { "keyFile": "/path/to/id_rsa", "passphrase": "", "password": "" },
-  "path": "/var/log/nginx/access.log",
-  "pattern": "",
-  "compression": "auto"
-}
-```
-
-#### http source (single file)
-```json
-{
-  "id": "http-main",
-  "type": "http",
-  "url": "https://example.com/logs/access.log",
-  "headers": { "Authorization": "Bearer TOKEN" },
-  "rangePolicy": "auto",
-  "compression": "auto"
-}
-```
-
-#### http source (index list)
-```json
-{
-  "id": "http-index",
-  "type": "http",
-  "url": "https://example.com/logs/access.log",
-  "index": {
-    "url": "https://example.com/logs/index.json",
-    "method": "GET",
-    "headers": { "Authorization": "Bearer TOKEN" },
-    "jsonMap": {
-      "items": "items",
-      "path": "path",
-      "size": "size",
-      "mtime": "mtime",
-      "etag": "etag",
-      "compressed": "compressed"
-    }
-  }
-}
-```
-
-#### s3 source
-```json
-{
-  "id": "s3-main",
-  "type": "s3",
-  "endpoint": "https://s3.amazonaws.com",
-  "region": "ap-northeast-1",
-  "bucket": "my-bucket",
-  "prefix": "nginx/",
-  "pattern": "*.log.gz",
-  "accessKey": "AKIA...",
-  "secretKey": "SECRET...",
-  "compression": "gz"
-}
-```
-
-#### agent source
-Use this only for agent-pushed logs. The `id` must match the agent config `sourceID`; the source is used for parse overrides and is not periodically scanned by the NginxPulse server. For installation, deployment, and `/api/ingest/logs` push setup, see the Push Agent section in [Log Parsing](Log-Parsing-EN).
-
-```json
-{
-  "id": "agent-main",
-  "type": "agent"
-}
-```
-
-#### Complete `sources` example (SFTP key-based pull)
-You can place this directly inside one `websites[]` item:
+### Local or Container Nginx Logs
 ```json
 {
   "name": "Main Site",
+  "logPath": "/var/log/nginx/access.log",
   "domains": ["example.com", "www.example.com"],
-  "sources": [
+  "logType": "nginx"
+}
+```
+
+For rotated daily logs, use a glob:
+```json
+{
+  "name": "Main Site",
+  "logPath": "/var/log/nginx/access-*.log",
+  "domains": ["example.com"],
+  "logType": "nginx"
+}
+```
+
+### Docker-Mounted Logs
+The config must use the path inside the container, not the host path:
+```yaml
+volumes:
+  - /var/log/nginx:/share/logs/nginx:ro
+```
+
+```json
+{
+  "name": "Main Site",
+  "logPath": "/share/logs/nginx/access.log",
+  "domains": ["example.com"],
+  "logType": "nginx"
+}
+```
+
+### Multiple Sites
+```json
+{
+  "websites": [
     {
-      "id": "sftp-main",
-      "type": "sftp",
-      "mode": "poll",
-      "host": "192.168.6.131",
-      "port": 22,
-      "user": "root",
-      "auth": {
-        "keyFile": "/home/nginxpulse/.ssh/nginxpulse_sftp",
-        "passphrase": "",
-        "password": ""
-      },
-      "path": "/var/log/nginx/access.log",
-      "pattern": "/var/log/nginx/access-*.log.gz",
-      "pollInterval": "5s",
-      "compression": "auto"
+      "name": "Main Site",
+      "logPath": "/share/logs/nginx/main-access.log",
+      "domains": ["example.com", "www.example.com"],
+      "logType": "nginx"
+    },
+    {
+      "name": "Blog",
+      "logPath": "/share/logs/nginx/blog-access.log",
+      "domains": ["blog.example.com"],
+      "logType": "nginx"
     }
   ]
 }
 ```
-Notes:
-- `auth.keyFile` must be an absolute path accessible on the machine (or container) running NginxPulse.
-- If the private key is encrypted, fill `auth.passphrase`; otherwise keep it empty.
 
-### system
-- `logDestination`: `file` or `stdout`.
-- `taskInterval`: interval for periodic tasks, default `1m`.
-- `httpSourceTimeout`: timeout for remote HTTP log reads (Go duration), default `2m` (e.g. `30s`, `2m`).
-- `logRetentionDays`: days to keep logs.
-- `parseBatchSize`: log parse batch size.
-- `ipGeoCacheLimit`: max IP cache entries.
-- `ipGeoApiUrl`: remote IP geo API URL, default `http://ip-api.com/batch`. Note: custom APIs must follow the contract described in the IP Geo documentation.
-- `demoMode`: demo mode on/off.
-- `accessKeys`: access key list.
-- `language`: `zh-CN` or `en-US`.
+### Host-Based Site Auto Discovery
+In plain terms: before this feature, you had to tell NginxPulse which sites exist. With this feature, NginxPulse can read the domain from logs first, then create sites automatically.
 
-### database
-- `driver`: `postgres` only.
-- `dsn`: PostgreSQL DSN (required).
-- `maxOpenConns`: max open connections.
-- `maxIdleConns`: max idle connections.
-- `connMaxLifetime`: max connection lifetime.
-
-### server
-- `Port`: API listen port.
-
-### pvFilter
-- `statusCodeInclude`: PV status codes (default `[200]`).
-- `excludePatterns`: URL regex list to skip.
-- `excludeIPs`: IP list to skip.
-
-## Environment overrides
-Supported env vars:
-- `CONFIG_JSON`, `WEBSITES`
-- `LOG_DEST`, `TASK_INTERVAL`, `LOG_RETENTION_DAYS`
-- `HTTP_SOURCE_TIMEOUT`
-- `LOG_PARSE_BATCH_SIZE`, `IP_GEO_CACHE_LIMIT`
-- `IP_GEO_API_URL`
-- `DEMO_MODE`, `ACCESS_KEYS`, `APP_LANGUAGE`
-- `SERVER_PORT`
-- `PV_STATUS_CODES`, `PV_EXCLUDE_PATTERNS`, `PV_EXCLUDE_IPS`
-- `DB_DRIVER`, `DB_DSN`, `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`, `DB_CONN_MAX_LIFETIME`
-
-Example:
-```bash
-export CONFIG_JSON="$(cat configs/nginxpulse_config.json)"
-export LOG_PARSE_BATCH_SIZE=1000
-export DB_DSN="postgres://nginxpulse:nginxpulse@127.0.0.1:5432/nginxpulse?sslmode=disable"
+Previously, if one Nginx / Nginx Proxy Manager instance hosted many domains, you usually had to configure each site manually:
+```json
+{
+  "name": "a.com",
+  "logPath": "/share/logs/nginx/access.log",
+  "domains": ["a.com"],
+  "logFormat": "... $host"
+},
+{
+  "name": "b.com",
+  "logPath": "/share/logs/nginx/access.log",
+  "domains": ["b.com"],
+  "logFormat": "... $host"
+}
 ```
+
+If you later add `c.com`, you also need to add another site config.
+
+With `autoDiscoverHosts`, you only configure one discovery template. NginxPulse periodically scans matching logs, extracts domains from the `host` field, and registers real sites by domain. For example, if the logs contain `a.com`, `b.com`, and `c.com`, the site selector will show those 3 sites; each site only counts log entries for its own domain.
+
+The requirement is that the log format must include a domain field, such as `$host` or `$http_host`. If the logs only contain IP, time, and URL, NginxPulse cannot know which site a request belongs to.
+
+nginx-proxy-manager can use the built-in log type directly:
+```json
+{
+  "name": "NPM Auto Discover",
+  "logPath": "/share/logs/npm/proxy-host-*_access.log",
+  "logType": "nginx-proxy-manager",
+  "autoDiscoverHosts": true
+}
+```
+
+Plain Nginx or custom logs also work as long as `logFormat` / `logRegex` can parse a `host` value. For example:
+```json
+{
+  "name": "Host Auto Discover",
+  "logPath": "/share/logs/nginx/*.log",
+  "logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $host",
+  "autoDiscoverHosts": true
+}
+```
+
+If you use `logRegex`, include a named group like `(?P<host>...)`.
+
+### Remote Logs or Multi-Source Collection
+When logs are not on the NginxPulse host/container, use `websites[].sources`:
+```json
+{
+  "name": "Main Site",
+  "domains": ["example.com"],
+  "sources": [
+    {
+      "id": "sftp-main",
+      "type": "sftp",
+      "host": "10.0.0.10",
+      "port": 22,
+      "user": "nginx",
+      "auth": { "keyFile": "/home/nginxpulse/.ssh/id_ed25519" },
+      "path": "/var/log/nginx/access.log",
+      "compression": "auto"
+    }
+  ],
+  "logType": "nginx"
+}
+```
+
+More `local`, `sftp`, `http`, `s3`, and `agent` examples are in [Log Sources](Log-Sources-EN).
+
+### Custom Log Format
+If no built-in `logType` matches your logs, prefer `logFormat`:
+```json
+{
+  "name": "Custom Site",
+  "logPath": "/var/log/custom/access.log",
+  "logFormat": "$remote_addr [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\""
+}
+```
+
+Custom fields and full examples are in [Supported Log Formats](Supported-Log-Formats-EN).
+
+### Reverse Proxy Subpath
+To serve NginxPulse under `/nginxpulse/`:
+```json
+{
+  "system": {
+    "webBasePath": "nginxpulse"
+  }
+}
+```
+
+Result:
+- Web: `/nginxpulse/`
+- Mobile: `/nginxpulse/m/`
+- API: `/nginxpulse/api/`
+
+Note: `webBasePath` only supports one path segment. Restart the service after changing it.
+
+## Detailed Docs
+- [Config Reference](Config-Reference-EN)
+- [Log Sources](Log-Sources-EN)
+- [Supported Log Formats](Supported-Log-Formats-EN)
+- [Agent Collection](Agent-EN)
+- [Log Parsing](Log-Parsing-EN)
+- [IP Geo](IP-Geo-EN)

@@ -58,6 +58,7 @@ export interface WebsiteConfig {
   timeLayout?: string;
   sources?: SourceConfig[];
   whitelist?: WhitelistConfig;
+  autoDiscoverHosts?: boolean;
 }
 
 export interface SystemConfig {
@@ -76,6 +77,16 @@ export interface SystemConfig {
   language?: string;
   webBasePath?: string;
   mobilePwaEnabled?: boolean;
+  serverStatus?: ServerStatusConfig;
+}
+
+export interface ServerStatusConfig {
+  enabled?: boolean;
+  mockEnabled?: boolean;
+  metricsUrl?: string;
+  disksUrl?: string;
+  timeout?: string;
+  refreshInterval?: string;
 }
 
 export interface ServerConfig {
@@ -124,6 +135,44 @@ export interface ConfigResponse {
 export interface ConfigSaveResponse {
   success: boolean;
   restart_required?: boolean;
+}
+
+export interface ServerDiskStatus {
+  name?: string;
+  path?: string;
+  smartctl_path?: string;
+  type?: string;
+  model?: string;
+  serial?: string;
+  firmware_version?: string;
+  smartctl_exit_status?: number;
+  size_bytes?: number;
+  smart_available?: boolean;
+  smart_enabled?: boolean;
+  health_passed?: boolean;
+  temperature_celsius?: number;
+  percentage_used?: number;
+  percentage_remaining?: number;
+  media_errors?: number;
+  error_log_entries?: number;
+  unsafe_shutdowns?: number;
+  power_on_hours?: number;
+  power_cycles?: number;
+  data_units_read_bytes?: number;
+  data_units_written_bytes?: number;
+  [key: string]: unknown;
+}
+
+export interface ServerStatusResponse {
+  enabled: boolean;
+  status: 'ok' | 'warning' | 'partial' | 'error' | 'disabled' | string;
+  updated_at?: string;
+  metrics?: Record<string, number | string | null>;
+  missing_metrics?: string[];
+  disk_count?: number;
+  disks?: ServerDiskStatus[];
+  errors?: string[];
+  refresh_interval_seconds?: number;
 }
 
 export interface TimeSeriesStats {

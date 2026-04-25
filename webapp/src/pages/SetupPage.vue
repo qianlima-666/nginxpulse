@@ -184,6 +184,24 @@
                       />
                     </div>
                   </div>
+                  <div class="setup-feature-card setup-feature-card-compact">
+                    <div class="setup-feature-icon">
+                      <i class="ri-radar-line" aria-hidden="true"></i>
+                    </div>
+                    <div class="setup-feature-body">
+                      <div class="setup-feature-title">{{ t('setup.fields.autoDiscoverHosts') }}</div>
+                      <div class="setup-feature-desc">{{ t('setup.hints.autoDiscoverHosts') }}</div>
+                    </div>
+                    <button
+                      class="setup-switch"
+                      type="button"
+                      :class="{ active: site.autoDiscoverHosts }"
+                      :aria-pressed="site.autoDiscoverHosts"
+                      @click="site.autoDiscoverHosts = !site.autoDiscoverHosts"
+                    >
+                      <span class="setup-switch-dot"></span>
+                    </button>
+                  </div>
                   <div class="setup-parse-group">
                     <div class="setup-parse-head">
                       <div class="setup-parse-title">{{ t('setup.logValidation.groupTitle') }}</div>
@@ -449,10 +467,10 @@
                     <span class="setup-switch-dot"></span>
                   </button>
                 </div>
-                <div class="setup-feature-card">
-                  <div class="setup-feature-icon">
-                    <i class="ri-smartphone-line" aria-hidden="true"></i>
-                  </div>
+	                <div class="setup-feature-card">
+	                  <div class="setup-feature-icon">
+	                    <i class="ri-smartphone-line" aria-hidden="true"></i>
+	                  </div>
                   <div class="setup-feature-body">
                     <div class="setup-feature-title">{{ t('setup.fields.mobilePwaEnabled') }}</div>
                     <div class="setup-feature-desc">{{ t('setup.hints.mobilePwaEnabled') }}</div>
@@ -465,11 +483,89 @@
                     @click="systemDraft.mobilePwaEnabled = !systemDraft.mobilePwaEnabled"
                   >
                     <span class="setup-switch-dot"></span>
-                  </button>
-                </div>
-              </div>
+	                  </button>
+	                </div>
+	              </div>
 
-              <button
+	              <div class="setup-feature-card setup-feature-card-wide">
+	                <div class="setup-feature-icon">
+	                  <i class="ri-server-line" aria-hidden="true"></i>
+	                </div>
+	                <div class="setup-feature-body">
+	                  <div class="setup-feature-title">{{ t('setup.fields.serverStatusEnabled') }}</div>
+	                  <div class="setup-feature-desc">{{ t('setup.hints.serverStatusEnabled') }}</div>
+	                </div>
+	                <button
+	                  class="setup-switch"
+	                  type="button"
+	                  :class="{ active: systemDraft.serverStatusEnabled }"
+	                  :aria-pressed="systemDraft.serverStatusEnabled"
+	                  @click="systemDraft.serverStatusEnabled = !systemDraft.serverStatusEnabled"
+	                >
+	                  <span class="setup-switch-dot"></span>
+	                </button>
+	              </div>
+
+	              <div v-if="systemDraft.serverStatusEnabled" class="setup-advanced setup-server-status-fields">
+	                <div class="setup-field-grid">
+	                  <div class="setup-field">
+	                    <label class="setup-label">{{ t('setup.fields.serverStatusMetricsUrl') }}</label>
+	                    <input
+	                      v-model.trim="systemDraft.serverStatusMetricsUrl"
+	                      class="setup-input"
+	                      type="url"
+	                      :placeholder="t('setup.placeholders.serverStatusMetricsUrl')"
+	                    />
+	                    <div class="setup-hint">{{ t('setup.hints.serverStatusMetricsUrl') }}</div>
+	                    <div v-if="fieldError('system.serverStatus.metricsUrl')" class="setup-error">
+	                      {{ fieldError('system.serverStatus.metricsUrl') }}
+	                    </div>
+	                  </div>
+	                  <div class="setup-field">
+	                    <label class="setup-label">{{ t('setup.fields.serverStatusDisksUrl') }}</label>
+	                    <input
+	                      v-model.trim="systemDraft.serverStatusDisksUrl"
+	                      class="setup-input"
+	                      type="url"
+	                      :placeholder="t('setup.placeholders.serverStatusDisksUrl')"
+	                    />
+	                    <div class="setup-hint">{{ t('setup.hints.serverStatusDisksUrl') }}</div>
+	                    <div v-if="fieldError('system.serverStatus.disksUrl')" class="setup-error">
+	                      {{ fieldError('system.serverStatus.disksUrl') }}
+	                    </div>
+	                  </div>
+	                </div>
+	                <div class="setup-field-grid">
+	                  <div class="setup-field">
+	                    <label class="setup-label">{{ t('setup.fields.serverStatusTimeout') }}</label>
+	                    <input
+	                      v-model.trim="systemDraft.serverStatusTimeout"
+	                      class="setup-input"
+	                      type="text"
+	                      :placeholder="t('setup.placeholders.serverStatusTimeout')"
+	                    />
+	                    <div class="setup-hint">{{ t('setup.hints.serverStatusTimeout') }}</div>
+	                    <div v-if="fieldError('system.serverStatus.timeout')" class="setup-error">
+	                      {{ fieldError('system.serverStatus.timeout') }}
+	                    </div>
+	                  </div>
+	                  <div class="setup-field">
+	                    <label class="setup-label">{{ t('setup.fields.serverStatusRefreshInterval') }}</label>
+	                    <input
+	                      v-model.trim="systemDraft.serverStatusRefreshInterval"
+	                      class="setup-input"
+	                      type="text"
+	                      :placeholder="t('setup.placeholders.serverStatusRefreshInterval')"
+	                    />
+	                    <div class="setup-hint">{{ t('setup.hints.serverStatusRefreshInterval') }}</div>
+	                    <div v-if="fieldError('system.serverStatus.refreshInterval')" class="setup-error">
+	                      {{ fieldError('system.serverStatus.refreshInterval') }}
+	                    </div>
+	                  </div>
+	                </div>
+	              </div>
+
+	              <button
                 class="setup-advanced-toggle"
                 type="button"
                 :aria-expanded="advancedOpen.system"
@@ -733,6 +829,7 @@ interface WebsiteDraft {
   logType: string;
   logFormat: string;
   logRegex: string;
+  autoDiscoverHosts: boolean;
   logValidationStatus: LogValidationStatus;
   logValidationMessage: string;
   timeLayout: string;
@@ -839,6 +936,12 @@ const systemDraft = reactive({
   alertPushJson: '',
   demoMode: false,
   mobilePwaEnabled: false,
+  serverStatusEnabled: false,
+  serverStatusMockEnabled: false,
+  serverStatusMetricsUrl: '',
+  serverStatusDisksUrl: '',
+  serverStatusTimeout: '5s',
+  serverStatusRefreshInterval: '30s',
   accessKeysText: '',
   accessKeyExpireDays: '7',
   language: 'zh-CN',
@@ -907,6 +1010,7 @@ function createWebsiteDraft(prefillLogPath = ''): WebsiteDraft {
     logType: 'nginx',
     logFormat: '',
     logRegex: '',
+    autoDiscoverHosts: false,
     logValidationStatus: 'idle',
     logValidationMessage: '',
     timeLayout: '',
@@ -942,6 +1046,7 @@ const baseLogTypeOptions: LogTypeOption[] = [
   { value: 'haproxy-ingress', label: 'HAProxy Ingress' },
   { value: 'nginx-proxy-manager', label: 'Nginx Proxy Manager' },
   { value: 'safeline', label: 'SafeLine WAF' },
+  { value: 'zoraxy', label: 'Zoraxy' },
   { value: 'caddy', label: 'Caddy' },
 ];
 
@@ -1313,6 +1418,22 @@ function splitList(value: string) {
     .filter(Boolean);
 }
 
+function validateURLField(value: string, field: string, errors: FieldError[]) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    errors.push({ field, message: t('setup.errors.required') });
+    return;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      errors.push({ field, message: t('setup.errors.httpUrlRequired') });
+    }
+  } catch {
+    errors.push({ field, message: t('setup.errors.invalidUrl') });
+  }
+}
+
 function parseOptionalInt(
   value: string | number | null | undefined,
   field: string,
@@ -1439,6 +1560,7 @@ function buildConfig(collectErrors = true): { config: ConfigPayload; errors: Fie
       timeLayout: site.timeLayout.trim(),
       sources,
       whitelist,
+      autoDiscoverHosts: site.autoDiscoverHosts,
     };
   });
 
@@ -1454,6 +1576,18 @@ function buildConfig(collectErrors = true): { config: ConfigPayload; errors: Fie
       errors.push({ field: 'system.webBasePath', message: t('setup.errors.webBasePathSingleSegment') });
     } else if (!/^[a-zA-Z0-9_-]+$/.test(webBasePath)) {
       errors.push({ field: 'system.webBasePath', message: t('setup.errors.webBasePathInvalid') });
+    }
+  }
+  if (collectErrors && systemDraft.serverStatusEnabled && !systemDraft.serverStatusMockEnabled) {
+    validateURLField(systemDraft.serverStatusMetricsUrl, 'system.serverStatus.metricsUrl', errors);
+    validateURLField(systemDraft.serverStatusDisksUrl, 'system.serverStatus.disksUrl', errors);
+  }
+  if (collectErrors && systemDraft.serverStatusEnabled) {
+    if (!systemDraft.serverStatusTimeout.trim()) {
+      errors.push({ field: 'system.serverStatus.timeout', message: t('setup.errors.required') });
+    }
+    if (!systemDraft.serverStatusRefreshInterval.trim()) {
+      errors.push({ field: 'system.serverStatus.refreshInterval', message: t('setup.errors.required') });
     }
   }
 
@@ -1475,6 +1609,14 @@ function buildConfig(collectErrors = true): { config: ConfigPayload; errors: Fie
       accessKeyExpireDays: parseOptionalInt(systemDraft.accessKeyExpireDays, 'system.accessKeyExpireDays', errors, false),
       language: systemDraft.language,
       webBasePath,
+      serverStatus: {
+        enabled: systemDraft.serverStatusEnabled,
+        mockEnabled: systemDraft.serverStatusMockEnabled,
+        metricsUrl: systemDraft.serverStatusMetricsUrl.trim(),
+        disksUrl: systemDraft.serverStatusDisksUrl.trim(),
+        timeout: systemDraft.serverStatusTimeout.trim() || '5s',
+        refreshInterval: systemDraft.serverStatusRefreshInterval.trim() || '30s',
+      },
     },
     server: {
       Port: normalizePort(serverPort.value),
@@ -1725,6 +1867,12 @@ function hydrateDraft(config: ConfigPayload) {
   systemDraft.alertPushJson = config.system?.alertPush ? JSON.stringify(config.system.alertPush, null, 2) : '';
   systemDraft.demoMode = Boolean(config.system?.demoMode);
   systemDraft.mobilePwaEnabled = Boolean(config.system?.mobilePwaEnabled);
+  systemDraft.serverStatusEnabled = Boolean(config.system?.serverStatus?.enabled);
+  systemDraft.serverStatusMockEnabled = Boolean(config.system?.serverStatus?.mockEnabled);
+  systemDraft.serverStatusMetricsUrl = config.system?.serverStatus?.metricsUrl || '';
+  systemDraft.serverStatusDisksUrl = config.system?.serverStatus?.disksUrl || '';
+  systemDraft.serverStatusTimeout = config.system?.serverStatus?.timeout || '5s';
+  systemDraft.serverStatusRefreshInterval = config.system?.serverStatus?.refreshInterval || '30s';
   systemDraft.accessKeysText = (config.system?.accessKeys || []).join(', ');
   systemDraft.accessKeyExpireDays = String(config.system?.accessKeyExpireDays ?? 7);
   systemDraft.language = config.system?.language || 'zh-CN';
@@ -1744,6 +1892,7 @@ function hydrateDraft(config: ConfigPayload) {
     logType: site.logType || 'nginx',
     logFormat: site.logFormat || '',
     logRegex: site.logRegex || '',
+    autoDiscoverHosts: Boolean(site.autoDiscoverHosts),
     logValidationStatus: 'idle' as LogValidationStatus,
     logValidationMessage: '',
     timeLayout: site.timeLayout || '',
