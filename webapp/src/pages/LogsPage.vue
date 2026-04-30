@@ -57,6 +57,7 @@
               />
               <Button
                 class="export-btn action-btn"
+                outlined
                 severity="success"
                 icon="pi pi-file-export"
                 :label="exportButtonLabel"
@@ -2455,11 +2456,13 @@ function nextPage() {
 .logs-control-box :deep(.p-button),
 .logs-control-box :deep(.p-inputtext),
 .logs-control-box :deep(.p-inputnumber-input),
-.logs-control-box :deep(.p-dropdown) {
+.logs-control-box :deep(.p-dropdown),
+.logs-control-box :deep(.p-select) {
   height: var(--control-height);
 }
 
-.logs-control-box :deep(.p-dropdown-label) {
+.logs-control-box :deep(.p-dropdown-label),
+.logs-control-box :deep(.p-select-label) {
   display: flex;
   align-items: center;
 }
@@ -2484,25 +2487,32 @@ function nextPage() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 4px;
+  height: var(--control-height);
+  padding: 0;
   margin-left: auto;
-  border-radius: calc(var(--radius-sm) + 2px);
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--panel-muted) 90%, var(--panel) 10%);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  box-sizing: border-box;
   flex: 0 0 auto;
 }
 
 .search-btn {
-  font-weight: 600;
+  font-weight: 700;
   border-radius: var(--radius-sm);
+  height: var(--control-height);
   min-width: 82px;
   padding: 0 14px;
+  box-shadow: 0 8px 16px rgba(var(--primary-color-rgb), 0.18);
 }
 
 .action-btn {
   border-radius: var(--radius-sm);
+  height: var(--control-height);
   min-width: 0;
-  padding: 0 10px;
+  padding: 0 12px;
+  font-weight: 700;
+  box-shadow: none;
 }
 
 .filter-row {
@@ -2668,7 +2678,8 @@ function nextPage() {
   min-width: 120px;
 }
 
-.date-range-select :deep(.p-dropdown-label) {
+.date-range-select :deep(.p-dropdown-label),
+.date-range-select :deep(.p-select-label) {
   font-size: 12px;
 }
 
@@ -2685,11 +2696,13 @@ function nextPage() {
   min-width: 120px;
 }
 
-.sort-select :deep(.p-dropdown) {
+.sort-select :deep(.p-dropdown),
+.sort-select :deep(.p-select) {
   font-size: 12px;
 }
 
-.sort-select :deep(.p-dropdown-label) {
+.sort-select :deep(.p-dropdown-label),
+.sort-select :deep(.p-select-label) {
   font-size: 12px;
 }
 
@@ -2922,10 +2935,6 @@ function nextPage() {
   text-align: center;
 }
 
-.log-detail-dialog :deep(.p-dialog-content) {
-  padding-top: 8px;
-}
-
 .log-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3072,33 +3081,77 @@ function nextPage() {
 }
 
 .reparse-btn {
-  font-weight: 600;
   white-space: nowrap;
+  color: var(--error-color);
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.reparse-btn:not(:disabled):hover {
+  border-color: rgba(239, 68, 68, 0.44);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .export-btn {
-  font-weight: 600;
   white-space: nowrap;
-  color: #ffffff;
-  border-color: #16a34a;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  box-shadow: 0 8px 16px rgba(22, 163, 74, 0.28);
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  color: #16a34a;
+  border-color: rgba(22, 163, 74, 0.28);
+  background: rgba(34, 197, 94, 0.06);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .export-btn:not(:disabled):hover {
-  border-color: #15803d;
-  background: linear-gradient(135deg, #34d399 0%, #16a34a 100%);
-  box-shadow: 0 10px 18px rgba(21, 128, 61, 0.34);
+  color: #15803d;
+  border-color: rgba(22, 163, 74, 0.44);
+  background: rgba(34, 197, 94, 0.1);
 }
 
-.export-btn:not(:disabled):active {
-  transform: translateY(1px);
-  box-shadow: 0 6px 12px rgba(21, 128, 61, 0.28);
+body.dark-mode .search-actions {
+  background: transparent;
+  box-shadow: none;
 }
 
-.reparse-dialog :deep(.p-dialog-content) {
-  padding-top: 8px;
+body.dark-mode .search-btn {
+  border-color: rgba(96, 165, 250, 0.6);
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: #eff6ff;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.28);
+}
+
+body.dark-mode .search-btn:not(:disabled):hover {
+  border-color: rgba(147, 197, 253, 0.72);
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+}
+
+body.dark-mode .reparse-btn {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+body.dark-mode .reparse-btn:not(:disabled):hover {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.68);
+  background: rgba(248, 113, 113, 0.16);
+}
+
+body.dark-mode .export-btn {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.42);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+body.dark-mode .export-btn:not(:disabled):hover {
+  color: #bbf7d0;
+  border-color: rgba(74, 222, 128, 0.68);
+  background: rgba(34, 197, 94, 0.16);
+}
+
+body.dark-mode .action-btn:disabled {
+  color: rgba(148, 163, 184, 0.62);
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.42);
 }
 
 .logs-reparse-dialog :deep(.p-dialog-content) {

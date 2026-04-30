@@ -791,7 +791,7 @@ const zhCN = {
     migrationSubmit: '确定并开始解析',
     migrationLoading: '迁移处理中...',
     migrationError: '迁移触发失败，请稍后重试',
-    export: '导出Excel',
+    export: '导出',
     exportLoading: '导出中...',
     exportError: '导出失败，请稍后重试',
     exportTimeout: '导出超时，请稍后再试',

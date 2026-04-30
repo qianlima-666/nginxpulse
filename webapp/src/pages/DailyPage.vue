@@ -2374,15 +2374,20 @@ function buildDayTimeRange(dateStr: string) {
 
 :deep(.header-toolbar.header-toolbar-tech .toolbar-date-picker .p-inputtext) {
   height: var(--toolbar-item-height);
-  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
-  background: linear-gradient(180deg, rgba(var(--primary-color-rgb), 0.07), rgba(var(--primary-color-rgb), 0.03));
-  border: 1px solid rgba(var(--primary-color-rgb), 0.14);
+  border-radius: 12px 0 0 12px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(148, 163, 184, 0.28);
   border-right: 0;
   box-shadow: inset 0 0 0 1px transparent;
 }
 :deep(.p-datepicker-dropdown) {
-  border-start-end-radius: var(--radius-pill);
-  border-end-end-radius: var(--radius-pill);
+  border-start-end-radius: 12px;
+  border-end-end-radius: 12px;
+}
+
+:global(body.dark-mode) :deep(.header-toolbar.header-toolbar-tech .toolbar-date-picker .p-inputtext) {
+  background: rgba(15, 23, 42, 0.64);
+  border-color: rgba(148, 163, 184, 0.26);
 }
 
 .daily-kpi-compare {

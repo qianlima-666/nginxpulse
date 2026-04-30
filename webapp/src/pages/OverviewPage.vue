@@ -728,7 +728,13 @@
             <div class="detail-title" id="detail-title">{{ detailTitle }}</div>
             <div class="detail-sub" id="detail-subtitle">{{ detailSubtitle }}</div>
           </div>
-          <button class="ghost-button detail-close" type="button" @click="closeDetail">{{ t('common.close') }}</button>
+          <button
+            class="detail-close"
+            type="button"
+            :aria-label="t('common.close')"
+            :title="t('common.close')"
+            @click="closeDetail"
+          ></button>
         </div>
         <div class="detail-body">
           <div class="detail-filters" v-if="detailMode === 'logs'" aria-hidden="false">

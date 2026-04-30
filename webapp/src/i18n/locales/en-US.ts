@@ -793,7 +793,7 @@ const enUS = {
     migrationSubmit: 'Confirm and reparse',
     migrationLoading: 'Migration running...',
     migrationError: 'Failed to start migration. Please try again later.',
-    export: 'Export Excel',
+    export: 'Export',
     exportLoading: 'Exporting...',
     exportError: 'Export failed. Please try again.',
     exportTimeout: 'Export timed out. Please try again later.',

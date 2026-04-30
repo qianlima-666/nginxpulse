@@ -26,22 +26,18 @@
             :class="{ unread: !notice.read_at }"
           >
             <div class="system-notice-item-header">
-              <span class="system-notice-title">{{ notice.title }}</span>
+              <div class="system-notice-heading">
+                <span class="system-notice-dot" aria-hidden="true"></span>
+                <span class="system-notice-title">{{ notice.title }}</span>
+              </div>
               <span class="system-notice-time">{{ formatNoticeTime(notice.last_occurred_at || notice.created_at) }}</span>
             </div>
             <div class="system-notice-message">{{ notice.message }}</div>
-            <div class="system-notice-meta">
+            <div v-if="(notice.occurrences || 0) > 1 || !notice.read_at" class="system-notice-meta">
               <span v-if="(notice.occurrences || 0) > 1" class="system-notice-occurrence">
                 {{ t('notifications.occurrence', { count: notice.occurrences }) }}
               </span>
-              <button
-                v-if="notice.category === 'ip_geo'"
-                type="button"
-                class="system-notice-link"
-                @click="openFailureDialog"
-              >
-                {{ t('notifications.failureTitle') }}
-              </button>
+              <span v-else></span>
               <button
                 v-if="!notice.read_at"
                 type="button"
@@ -63,34 +59,38 @@
           {{ loadingMore ? t('common.loading') : t('notifications.loadMore') }}
         </button>
       </div>
-      <div class="system-dialog-actions">
-        <div class="system-dialog-actions-left">
-          <Button
-            outlined
-            class="system-notice-action"
-            :label="t('notifications.failureTitle')"
-            @click="openFailureDialog"
-          />
+      <template #footer>
+        <div class="system-dialog-footer">
+          <div class="system-dialog-actions-left">
+            <Button
+              text
+              class="system-notice-action"
+              icon="pi pi-list"
+              :label="t('notifications.failureTitle')"
+              @click="openFailureDialog"
+            />
+          </div>
+          <div class="system-dialog-actions-right">
+            <Button
+              outlined
+              severity="danger"
+              class="system-notice-action"
+              :label="t('notifications.clear')"
+              :disabled="notificationsClearing || loading"
+              @click="clearNotifications"
+            />
+            <Button
+              outlined
+              severity="secondary"
+              class="system-notice-action"
+              :label="t('notifications.markAllRead')"
+              :disabled="unreadCount === 0 || loading"
+              @click="markAllRead"
+            />
+            <Button class="system-notice-action" :label="t('common.close')" @click="dialogVisible = false" />
+          </div>
         </div>
-        <div class="system-dialog-actions-right">
-          <Button
-            outlined
-            severity="danger"
-            class="system-notice-action"
-            :label="t('notifications.clear')"
-            :disabled="notificationsClearing || loading"
-            @click="clearNotifications"
-          />
-          <Button
-            outlined
-            class="system-notice-action"
-            :label="t('notifications.markAllRead')"
-            :disabled="unreadCount === 0 || loading"
-            @click="markAllRead"
-          />
-          <Button class="system-notice-action" :label="t('common.close')" @click="dialogVisible = false" />
-        </div>
-      </div>
+      </template>
     </Dialog>
 
     <Dialog
@@ -147,39 +147,39 @@
             <span class="system-failure-reason">{{ item.reason }}</span>
             <span class="system-failure-time">{{ formatNoticeTime(item.created_at) }}</span>
           </div>
-        </div>
-        <button
-          v-if="failureHasMore"
-          type="button"
-          class="system-notice-load"
-          :disabled="failureLoadingMore"
-          @click="loadMoreFailures"
-        >
-          {{ failureLoadingMore ? t('common.loading') : t('notifications.loadMore') }}
-        </button>
-      </div>
-      <div class="system-dialog-actions">
-        <div class="system-dialog-actions-left">
-          <Button
-            outlined
-            class="system-notice-action"
-            :label="t('notifications.export')"
-            :disabled="failureExporting"
-            @click="exportFailures"
-          />
-          <Button
-            outlined
-            severity="danger"
-            class="system-notice-action"
-            :label="t('notifications.clear')"
-            :disabled="failureClearing || failureLoading"
-            @click="clearFailures"
-          />
-        </div>
-        <div class="system-dialog-actions-right">
-          <Button class="system-notice-action" :label="t('common.close')" @click="failureDialogVisible = false" />
+          <div v-if="failureHasMore" class="system-failure-load-row">
+            <button
+              type="button"
+              class="system-failure-load"
+              :disabled="failureLoadingMore"
+              @click="loadMoreFailures"
+            >
+              {{ failureLoadingMore ? t('common.loading') : t('notifications.loadMore') }}
+            </button>
+          </div>
         </div>
       </div>
+      <template #footer>
+        <div class="system-dialog-footer system-failure-footer">
+          <div class="system-dialog-actions-left">
+            <Button
+              outlined
+              class="system-notice-action"
+              :label="t('notifications.export')"
+              :disabled="failureExporting"
+              @click="exportFailures"
+            />
+            <Button
+              outlined
+              severity="danger"
+              class="system-notice-action"
+              :label="t('notifications.clear')"
+              :disabled="failureClearing || failureLoading"
+              @click="clearFailures"
+            />
+          </div>
+        </div>
+      </template>
     </Dialog>
 
     <Dialog
@@ -576,7 +576,7 @@ onUnmounted(() => {
 .system-notice-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .system-notice-loading,
@@ -589,25 +589,36 @@ onUnmounted(() => {
 .system-notice-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 360px;
+  gap: 8px;
+  max-height: 340px;
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 
 .system-notice-item {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  background: var(--panel);
+  padding: 12px 14px;
+  background: rgba(248, 250, 252, 0.72);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .system-notice-item.unread {
-  border-color: rgba(var(--primary-color-rgb), 0.5);
-  background: rgba(var(--primary-color-rgb), 0.08);
+  border-color: rgba(var(--primary-color-rgb), 0.26);
+  background: rgba(var(--primary-color-rgb), 0.055);
+}
+
+:global(body.dark-mode) .system-notice-item {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.54);
+}
+
+:global(body.dark-mode) .system-notice-item.unread {
+  border-color: rgba(var(--primary-color-rgb), 0.3);
+  background: rgba(var(--primary-color-rgb), 0.12);
 }
 
 .system-notice-item-header {
@@ -617,12 +628,38 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+.system-notice-heading {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.system-notice-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(148, 163, 184, 0.68);
+}
+
+.system-notice-item.unread .system-notice-dot {
+  background: var(--primary);
+  box-shadow: 0 0 0 4px rgba(var(--primary-color-rgb), 0.12);
+}
+
 .system-notice-title {
-  font-weight: 600;
-  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .system-notice-time {
+  flex: 0 0 auto;
   font-size: 12px;
   color: var(--muted);
 }
@@ -630,7 +667,7 @@ onUnmounted(() => {
 .system-notice-message {
   font-size: 13px;
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .system-notice-meta {
@@ -642,22 +679,15 @@ onUnmounted(() => {
   color: var(--muted);
 }
 
-.system-notice-link {
-  border: none;
-  background: transparent;
-  color: var(--accent-color);
+.system-notice-occurrence {
+  color: var(--muted);
   font-weight: 600;
-  cursor: pointer;
-}
-
-.system-notice-link:hover {
-  text-decoration: underline;
 }
 
 .system-notice-read {
   border: none;
   background: transparent;
-  color: var(--accent-color);
+  color: var(--primary);
   font-weight: 600;
   cursor: pointer;
 }
@@ -682,13 +712,27 @@ onUnmounted(() => {
   cursor: default;
 }
 
-.system-dialog-actions {
+.system-dialog-actions,
+.system-dialog-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 12px;
+}
+
+.system-dialog-actions {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.system-dialog-footer {
+  width: 100%;
+}
+
+.system-failure-footer {
+  justify-content: flex-start;
 }
 
 .system-dialog-actions-left,
@@ -704,13 +748,11 @@ onUnmounted(() => {
 }
 
 :global(.system-notice-dialog) {
-  width: 720px;
-  max-width: 94vw;
+  width: min(680px, calc(100vw - 32px));
 }
 
 :global(.system-failure-dialog) {
-  width: 920px;
-  max-width: 96vw;
+  width: min(860px, calc(100vw - 32px));
 }
 
 .system-failure-body {
@@ -722,57 +764,121 @@ onUnmounted(() => {
 .system-failure-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-sm);
+  background: rgba(248, 250, 252, 0.72);
 }
 
 .system-failure-select {
-  min-width: 140px;
+  width: 132px;
+  min-width: 132px;
 }
 
 .system-failure-input {
-  min-width: 180px;
+  width: 180px;
+  min-width: 160px;
 }
 
 .system-failure-action {
-  min-width: 90px;
+  min-width: 74px;
 }
 
 .system-failure-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: block;
   max-height: 360px;
   overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
 }
 
 .system-failure-row {
   display: grid;
   grid-template-columns: minmax(140px, 1.2fr) minmax(100px, 1fr) minmax(140px, 1fr);
   gap: 12px;
-  font-size: 12px;
-  padding: 8px 10px;
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--border);
-  background: var(--panel);
+  align-items: center;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.system-failure-row:last-child {
+  border-bottom: 0;
 }
 
 .system-failure-header {
-  font-weight: 600;
-  background: var(--panel-muted);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 38px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(248, 250, 252, 0.94);
+  backdrop-filter: blur(10px);
 }
 
 .system-failure-ip {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .system-failure-time {
   color: var(--muted);
 }
 
+.system-failure-load-row {
+  display: flex;
+  justify-content: center;
+  padding: 14px 12px 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.system-failure-load {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 6px;
+  transition: color 0.18s ease, opacity 0.18s ease;
+}
+
+.system-failure-load:hover {
+  color: var(--primary-strong);
+}
+
+.system-failure-load:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+:global(body.dark-mode) .system-failure-filters,
+:global(body.dark-mode) .system-failure-header {
+  background: rgba(15, 23, 42, 0.62);
+}
+
+:global(body.dark-mode) .system-failure-list,
+:global(body.dark-mode) .system-failure-filters {
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+:global(body.dark-mode) .system-failure-row {
+  border-bottom-color: rgba(148, 163, 184, 0.12);
+}
+
+:global(body.dark-mode) .system-failure-load-row {
+  border-top-color: rgba(148, 163, 184, 0.12);
+}
+
 :global(.system-confirm-dialog) {
-  width: 420px;
-  max-width: 92vw;
+  width: min(420px, calc(100vw - 32px));
 }
 
 .system-confirm-content {
@@ -796,7 +902,9 @@ onUnmounted(() => {
 .system-confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
 }
 </style>
