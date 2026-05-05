@@ -15,10 +15,9 @@
 ## 文档站点（推荐）
 
 > **在线文档站点：<https://nginx-pulse-docs.kaisir.cn/>**
->
-> Wiki 仍可访问（历史资料）：https://github.com/likaia/nginxpulse/wiki
 
-> ⚠️注意：此文档只讲解了如何使用这个项目，详细文档与示例配置请移步Wiki：https://github.com/likaia/nginxpulse/wiki
+
+> ⚠️注意：此文档只讲解了如何使用这个项目，详细文档与示例配置请移步[在线文档站点](https://nginx-pulse-docs.kaisir.cn/)
 
 ![demo-img-1.png](https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/demo-img-1.png)
 
