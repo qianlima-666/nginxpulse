@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"io"
@@ -17,6 +18,8 @@ import (
 )
 
 const maxHostDiscoveryLinesPerFile = 2000
+const maxHostDiscoveryTailBytes int64 = 512 * 1024
+const maxHostDiscoveryScannerBuffer = 1024 * 1024
 
 var domainLikePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$`)
 
@@ -153,20 +156,70 @@ func (p *LogParser) discoverHostsInFile(filePath string, parser *logLineParser) 
 		}
 		reader = gzReader
 		closer = gzReader
+	} else {
+		hosts, err := p.discoverHostsInRecentPlainFile(file, parser)
+		if err != nil {
+			logrus.WithError(err).Warnf("自动发现读取日志尾部失败: %s", filePath)
+		} else if len(hosts) > 0 {
+			return hosts
+		}
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			logrus.WithError(err).Warnf("自动发现无法重置日志文件位置: %s", filePath)
+			return nil
+		}
 	}
 	if closer != nil {
 		defer closer.Close()
 	}
 
+	return discoverHostsFromReader(reader, parser, maxHostDiscoveryLinesPerFile, filePath)
+}
+
+func (p *LogParser) discoverHostsInRecentPlainFile(file *os.File, parser *logLineParser) ([]string, error) {
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	size := info.Size()
+	if size <= 0 {
+		return nil, nil
+	}
+
+	offset := size - maxHostDiscoveryTailBytes
+	if offset < 0 {
+		offset = 0
+	}
+
+	buf := make([]byte, int(size-offset))
+	if _, err := file.ReadAt(buf, offset); err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	if offset > 0 {
+		newline := bytes.IndexByte(buf, '\n')
+		if newline < 0 {
+			return nil, nil
+		}
+		buf = buf[newline+1:]
+	}
+	if len(buf) == 0 {
+		return nil, nil
+	}
+
+	return discoverHostsFromReader(bytes.NewReader(buf), parser, 0, file.Name()), nil
+}
+
+func discoverHostsFromReader(reader io.Reader, parser *logLineParser, maxLines int, filePath string) []string {
 	hosts := make(map[string]struct{})
 	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 64*1024), maxHostDiscoveryScannerBuffer)
 	lines := 0
 	for scanner.Scan() {
 		lines++
 		if host := extractHostForDiscovery(parser, scanner.Text()); host != "" {
 			hosts[host] = struct{}{}
 		}
-		if lines >= maxHostDiscoveryLinesPerFile {
+		if maxLines > 0 && lines >= maxLines {
 			break
 		}
 	}

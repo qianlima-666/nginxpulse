@@ -191,6 +191,7 @@
                     <div class="setup-feature-body">
                       <div class="setup-feature-title">{{ t('setup.fields.autoDiscoverHosts') }}</div>
                       <div class="setup-feature-desc">{{ t('setup.hints.autoDiscoverHosts') }}</div>
+                      <div class="setup-hint">{{ t('setup.hints.autoDiscoverHostsScan') }}</div>
                     </div>
                     <button
                       class="setup-switch"
@@ -234,6 +235,7 @@
                         :placeholder="t('setup.placeholders.logFormat')"
                         @input="markLogValidationDirty(site)"
                       />
+                      <div class="setup-hint">{{ t('setup.hints.logRulePrecedence') }}</div>
                     </div>
                     <div class="setup-field">
                       <label class="setup-label">{{ t('setup.fields.logRegex') }}</label>
@@ -244,6 +246,7 @@
                         :placeholder="t('setup.placeholders.logRegex')"
                         @input="markLogValidationDirty(site)"
                       />
+                      <div class="setup-hint">{{ t('setup.hints.logRulePrecedence') }}</div>
                     </div>
                   </div>
                   <div class="setup-field">

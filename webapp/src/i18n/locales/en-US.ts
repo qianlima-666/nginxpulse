@@ -278,6 +278,8 @@ const enUS = {
     hints: {
       logPath: 'Use full path or glob patterns, recommended under /share/logs/, must be accessible in container',
       autoDiscoverHosts: 'When enabled, this entry is a discovery template; real websites are generated from parsed host values',
+      autoDiscoverHostsScan: 'Auto-discovery runs during log scanning, not in the validation dialog; recent lines near the end of the log are checked first',
+      logRulePrecedence: 'If both log format and log regex are filled in, validation and parsing will use log regex first',
       sourcesJson: 'Provide sources JSON for SFTP/HTTP/S3 advanced sources',
       accessKeys: 'Separate multiple keys with commas',
       accessKeyExpireDays: 'How many days an access key stays valid in browser storage (default: 7)',

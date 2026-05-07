@@ -278,6 +278,8 @@ const zhCN = {
     hints: {
       logPath: '支持完整路径或通配符，建议放在 /share/logs/，需在容器内可访问',
       autoDiscoverHosts: '开启后此配置只作为发现模板，系统会从日志 host 字段生成真实站点',
+      autoDiscoverHostsScan: '自动识别发生在日志扫描阶段，不在“校验日志规则”弹窗内触发；系统会优先读取日志尾部的近期内容',
+      logRulePrecedence: '若同时填写日志格式和日志正则，实际校验与解析都会优先使用日志正则',
       sourcesJson: '填写 sources 数组 JSON，用于 SFTP/HTTP/S3 等高级来源',
       accessKeys: '多个密钥用逗号分隔',
       accessKeyExpireDays: '访问密钥在浏览器本地保存的有效天数，默认 7 天',
