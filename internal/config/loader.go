@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -89,6 +91,7 @@ var (
 		MaxIdleConns:    5,
 		ConnMaxLifetime: "30m",
 	}
+	envPlaceholderPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}`)
 )
 
 func DefaultConfig() Config {
@@ -110,6 +113,8 @@ func DefaultConfig() Config {
 }
 
 func loadConfig() (*Config, error) {
+	loadDotEnvFiles()
+
 	cfg := DefaultConfig()
 	cfgPtr := &cfg
 	loaded := false
@@ -117,14 +122,22 @@ func loadConfig() (*Config, error) {
 	if ForceEmptyConfigEnabled() {
 		loaded = false
 	} else if raw, key := getEnvValue(envConfigJSON); raw != "" {
-		if err := json.Unmarshal([]byte(raw), cfgPtr); err != nil {
+		expanded, err := expandEnvPlaceholders(raw)
+		if err != nil {
+			return nil, fmt.Errorf("解析 %s 失败: %w", key, err)
+		}
+		if err := json.Unmarshal([]byte(expanded), cfgPtr); err != nil {
 			return nil, fmt.Errorf("解析 %s 失败: %w", key, err)
 		}
 		loaded = true
 	} else {
 		bytes, err := os.ReadFile(ConfigFile)
 		if err == nil {
-			if err := json.Unmarshal(bytes, cfgPtr); err != nil {
+			expanded, expandErr := expandEnvPlaceholders(string(bytes))
+			if expandErr != nil {
+				return nil, fmt.Errorf("解析 %s 失败: %w", ConfigFile, expandErr)
+			}
+			if err := json.Unmarshal([]byte(expanded), cfgPtr); err != nil {
 				return nil, err
 			}
 			loaded = true
@@ -146,6 +159,117 @@ func loadConfig() (*Config, error) {
 	}
 
 	return cfgPtr, nil
+}
+
+func loadDotEnvFiles() {
+	loadedFromDotEnv := make(map[string]struct{})
+	files := []string{
+		".env",
+		filepath.Join("configs", ".env"),
+		".env.local",
+		filepath.Join("configs", ".env.local"),
+	}
+	for _, path := range files {
+		_ = loadDotEnvFile(path, loadedFromDotEnv)
+	}
+}
+
+func loadDotEnvFile(path string, loadedFromDotEnv map[string]struct{}) error {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	lines := strings.Split(string(bytes), "\n")
+	for _, rawLine := range lines {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "export ") {
+			line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
+		}
+
+		idx := strings.Index(line, "=")
+		if idx <= 0 {
+			continue
+		}
+
+		key := strings.TrimSpace(line[:idx])
+		if key == "" {
+			continue
+		}
+
+		value := parseDotEnvValue(line[idx+1:])
+		if _, loaded := loadedFromDotEnv[key]; loaded {
+			_ = os.Setenv(key, value)
+			continue
+		}
+		if _, exists := os.LookupEnv(key); exists {
+			continue
+		}
+		_ = os.Setenv(key, value)
+		loadedFromDotEnv[key] = struct{}{}
+	}
+
+	return nil
+}
+
+func parseDotEnvValue(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") && len(value) >= 2 {
+		unquoted := strings.TrimSuffix(strings.TrimPrefix(value, "\""), "\"")
+		replacer := strings.NewReplacer(`\n`, "\n", `\r`, "\r", `\t`, "\t", `\"`, `"`, `\\`, `\`)
+		return replacer.Replace(unquoted)
+	}
+	if strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'") && len(value) >= 2 {
+		return strings.TrimSuffix(strings.TrimPrefix(value, "'"), "'")
+	}
+
+	if commentIdx := strings.Index(value, " #"); commentIdx >= 0 {
+		value = value[:commentIdx]
+	}
+	return strings.TrimSpace(value)
+}
+
+func expandEnvPlaceholders(raw string) (string, error) {
+	var expandErr error
+	expanded := envPlaceholderPattern.ReplaceAllStringFunc(raw, func(match string) string {
+		if expandErr != nil {
+			return match
+		}
+		parts := envPlaceholderPattern.FindStringSubmatch(match)
+		if len(parts) < 2 {
+			return match
+		}
+
+		name := parts[1]
+		fallback := ""
+		if len(parts) > 2 {
+			fallback = parts[2]
+		}
+
+		if value, exists := os.LookupEnv(name); exists {
+			return value
+		}
+		if fallback != "" {
+			return fallback
+		}
+
+		expandErr = fmt.Errorf("环境变量 %s 未设置", name)
+		return match
+	})
+	if expandErr != nil {
+		return "", expandErr
+	}
+	return expanded, nil
 }
 
 // HasEnvConfigSource reports if config can be loaded from env vars.

@@ -29,6 +29,10 @@ selenium-debug.log
 *.njsproj
 *.sln
 *.local
+.env
+.env.local
+configs/.env
+configs/.env.local
 # .editorconfig
 # .eslintignore
 # .eslintrc.js

@@ -92,6 +92,50 @@ ensure_config() {
   fi
 }
 
+load_local_env_files() {
+  local env_file=""
+  local env_files=(
+    "$ROOT_DIR/.env"
+    "$ROOT_DIR/configs/.env"
+    "$ROOT_DIR/.env.local"
+    "$ROOT_DIR/configs/.env.local"
+  )
+
+  for env_file in "${env_files[@]}"; do
+    if [[ -f "$env_file" ]]; then
+      set -a
+      # shellcheck disable=SC1090
+      source "$env_file"
+      set +a
+    fi
+  done
+}
+
+validate_dev_config_env() {
+  local placeholder=""
+  local var_name=""
+  local missing=()
+
+  while IFS= read -r placeholder; do
+    [[ -z "$placeholder" ]] && continue
+    if [[ "$placeholder" == *":-"* ]]; then
+      continue
+    fi
+    var_name="${placeholder#\$\{}"
+    var_name="${var_name%\}}"
+    if [[ -z "${!var_name:-}" ]]; then
+      missing+=("$var_name")
+    fi
+  done < <(rg -o '\$\{[A-Za-z_][A-Za-z0-9_]*(?::-([^}]*))?\}' "$DEV_CONFIG" | sort -u)
+
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    echo "Missing environment variables required by configs/nginxpulse_config.dev.json:" >&2
+    printf '  - %s\n' "${missing[@]}" >&2
+    echo "Set them in configs/.env or your shell environment, then retry." >&2
+    exit 1
+  fi
+}
+
 ensure_frontend_deps() {
   ensure_node_deps "$ROOT_DIR/webapp" "frontend" "vite"
 }
@@ -333,6 +377,8 @@ if should_use_local_go; then
 fi
 if ! is_truthy "$FORCE_SETUP_UI" && ! is_truthy "$FORCE_EMPTY_CONFIG"; then
   ensure_config
+  load_local_env_files
+  validate_dev_config_env
 else
   echo "FORCE_SETUP_UI enabled, skipping config file checks."
 fi
