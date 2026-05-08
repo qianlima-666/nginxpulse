@@ -39,6 +39,14 @@ const (
 	ipAPIBatchSize = 100
 )
 
+var newIPAPIHTTPClient = func() *http.Client {
+	return &http.Client{Timeout: ipAPITimeout}
+}
+
+var resolveIPAPIURLFunc = func() string {
+	return config.GetIPGeoAPIURL()
+}
+
 type IPLocation struct {
 	Domestic string
 	Global   string
@@ -315,13 +323,11 @@ func GetIPLocationBatch(ips []string) (map[string]IPLocation, map[string]string,
 			setCachedLocation(ip, fallback.Domestic, fallback.Global)
 			continue
 		}
-		if remoteErr == nil {
-			if _, failed := remoteFailures[ip]; failed {
-				continue
-			}
+		if _, failed := remoteFailures[ip]; failed && remoteErr == nil {
 			results[ip] = IPLocation{Domestic: "未知", Global: "未知", Source: "unknown"}
-			setCachedLocation(ip, "未知", "未知")
+			continue
 		}
+		results[ip] = IPLocation{Domestic: "未知", Global: "未知", Source: "unknown"}
 	}
 
 	if len(results) > 0 {
@@ -439,9 +445,9 @@ func queryIPLocationRemoteBatch(ips []string) (map[string]ipLocationCacheEntry, 
 		return results, failures, nil
 	}
 
-	client := &http.Client{Timeout: ipAPITimeout}
+	client := newIPAPIHTTPClient()
 	var lastErr error
-	apiURL := resolveIPAPIURL()
+	apiURL := resolveIPAPIURLFunc()
 
 	for start := 0; start < len(ips); start += ipAPIBatchSize {
 		end := start + ipAPIBatchSize
@@ -463,18 +469,14 @@ func queryIPLocationRemoteBatch(ips []string) (map[string]ipLocationCacheEntry, 
 		requestBody, err := json.Marshal(requestPayload)
 		if err != nil {
 			lastErr = err
-			for _, ip := range batch {
-				failures[ip] = "request_error"
-			}
+			markIPGeoFailures(failures, batch, "request_error")
 			continue
 		}
 
 		req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(requestBody))
 		if err != nil {
 			lastErr = err
-			for _, ip := range batch {
-				failures[ip] = "request_error"
-			}
+			markIPGeoFailures(failures, batch, "request_error")
 			continue
 		}
 		req.Header.Set("Content-Type", "application/json")
@@ -483,28 +485,22 @@ func queryIPLocationRemoteBatch(ips []string) (map[string]ipLocationCacheEntry, 
 		resp, err := client.Do(req)
 		if err != nil {
 			lastErr = err
-			for _, ip := range batch {
-				failures[ip] = "request_error"
-			}
-			continue
+			markIPGeoFailures(failures, ips[start:], "request_error")
+			break
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			lastErr = fmt.Errorf("ip-api 响应异常: %s", resp.Status)
 			resp.Body.Close()
-			for _, ip := range batch {
-				failures[ip] = "http_status"
-			}
-			continue
+			markIPGeoFailures(failures, ips[start:], "http_status")
+			break
 		}
 
 		var payload []ipAPIBatchResponse
 		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 			lastErr = err
 			resp.Body.Close()
-			for _, ip := range batch {
-				failures[ip] = "decode_error"
-			}
-			continue
+			markIPGeoFailures(failures, ips[start:], "decode_error")
+			break
 		}
 		resp.Body.Close()
 
@@ -535,6 +531,16 @@ func queryIPLocationRemoteBatch(ips []string) (map[string]ipLocationCacheEntry, 
 	}
 
 	return results, failures, lastErr
+}
+
+func markIPGeoFailures(failures map[string]string, ips []string, reason string) {
+	for _, ip := range ips {
+		ip = strings.TrimSpace(ip)
+		if ip == "" {
+			continue
+		}
+		failures[ip] = reason
+	}
 }
 
 // 解析 ip2region 返回的地区信息
@@ -676,10 +682,6 @@ func resolveIPAPILanguage() string {
 	default:
 		return config.DefaultLanguage
 	}
-}
-
-func resolveIPAPIURL() string {
-	return config.GetIPGeoAPIURL()
 }
 
 func getIPLocationLocalOnly(ip string) (string, string, bool) {
