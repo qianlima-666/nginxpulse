@@ -770,6 +770,46 @@ func (r *Repository) ClearIPGeoAPIFailuresFiltered(websiteID, reason, keyword st
 	return rows, nil
 }
 
+func (r *Repository) DeleteIPGeoAPIFailuresByIPs(ips []string) (int64, error) {
+	if len(ips) == 0 {
+		return 0, nil
+	}
+	values := make([]string, 0, len(ips))
+	args := make([]interface{}, 0, len(ips))
+	seen := make(map[string]struct{}, len(ips))
+	for _, raw := range ips {
+		ip := strings.TrimSpace(raw)
+		if ip == "" {
+			continue
+		}
+		if _, ok := seen[ip]; ok {
+			continue
+		}
+		seen[ip] = struct{}{}
+		values = append(values, "?")
+		args = append(args, ip)
+	}
+	if len(values) == 0 {
+		return 0, nil
+	}
+	query := fmt.Sprintf(`DELETE FROM "ip_geo_api_failures" WHERE ip IN (%s)`, strings.Join(values, ","))
+	result, err := r.db.Exec(sqlutil.ReplacePlaceholders(query), args...)
+	if err != nil {
+		return 0, err
+	}
+	rows, _ := result.RowsAffected()
+	return rows, nil
+}
+
+func (r *Repository) CountIPGeoAPIFailures() (int64, error) {
+	var count int64
+	row := r.db.QueryRow(`SELECT COUNT(*) FROM "ip_geo_api_failures"`)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (r *Repository) CreateSystemNotification(entry SystemNotification) (int64, error) {
 	level := strings.TrimSpace(entry.Level)
 	category := strings.TrimSpace(entry.Category)
@@ -1023,6 +1063,19 @@ func (r *Repository) DeleteSystemNotifications(ids []int64) (int64, error) {
 
 func (r *Repository) DeleteAllSystemNotifications() (int64, error) {
 	result, err := r.db.Exec(`DELETE FROM "system_notifications"`)
+	if err != nil {
+		return 0, err
+	}
+	rows, _ := result.RowsAffected()
+	return rows, nil
+}
+
+func (r *Repository) DeleteSystemNotificationByFingerprint(fingerprint string) (int64, error) {
+	fingerprint = strings.TrimSpace(fingerprint)
+	if fingerprint == "" {
+		return 0, nil
+	}
+	result, err := r.db.Exec(`DELETE FROM "system_notifications" WHERE fingerprint = $1`, fingerprint)
 	if err != nil {
 		return 0, err
 	}

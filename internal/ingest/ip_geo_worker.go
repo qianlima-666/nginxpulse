@@ -16,6 +16,7 @@ const (
 	pendingLocationLabel     = "待解析"
 	defaultIPGeoResolveBatch = 1000
 	ipGeoFailureCooldown     = 12 * time.Hour
+	ipGeoFailureFingerprint  = "ip_geo_api_failure"
 )
 
 func PendingLocationLabel() string {
@@ -275,6 +276,7 @@ func (p *LogParser) ProcessPendingIPGeo(limit int) int {
 			logrus.WithError(err).Warn("清理 IP 归属地待解析队列失败")
 			return 0
 		}
+		p.cleanupResolvedIPGeoFailures(resolved)
 	}
 
 	addIPGeoProcessed(int64(len(resolved)))
@@ -283,6 +285,31 @@ func (p *LogParser) ProcessPendingIPGeo(limit int) int {
 	}
 
 	return len(resolved)
+}
+
+func (p *LogParser) cleanupResolvedIPGeoFailures(resolved []string) {
+	if p == nil || p.repo == nil || len(resolved) == 0 {
+		return
+	}
+	deleted, err := p.repo.DeleteIPGeoAPIFailuresByIPs(resolved)
+	if err != nil {
+		logrus.WithError(err).Warn("清理已恢复的 IP 归属地失败记录失败")
+		return
+	}
+	if deleted <= 0 {
+		return
+	}
+	remaining, err := p.repo.CountIPGeoAPIFailures()
+	if err != nil {
+		logrus.WithError(err).Warn("统计剩余 IP 归属地失败记录失败")
+		return
+	}
+	if remaining > 0 {
+		return
+	}
+	if _, err := p.repo.DeleteSystemNotificationByFingerprint(ipGeoFailureFingerprint); err != nil {
+		logrus.WithError(err).Warn("清理 IP 归属地失败系统通知失败")
+	}
 }
 
 func (p *LogParser) recoverPendingIPGeoFromLogs(limit int) int {
