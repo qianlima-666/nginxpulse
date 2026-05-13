@@ -29,6 +29,13 @@ type ClientStatsManager struct {
 	statsType string
 }
 
+func clientStatsOrderByExpr(statsType string) string {
+	if statsType == "url" {
+		return "pv DESC, uv DESC"
+	}
+	return "uv DESC, pv DESC"
+}
+
 func NewURLStatsManager(userRepoPtr *store.Repository) *ClientStatsManager {
 	return &ClientStatsManager{
 		repo:      userRepoPtr,
@@ -187,6 +194,7 @@ func (s *ClientStatsManager) Query(query StatsQuery) (StatsResult, error) {
 	}
 
 	// 构建、执行查询
+	orderByExpr := clientStatsOrderByExpr(s.statsType)
 	dbQueryStr := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
         SELECT 
             %[1]s AS url, 
@@ -196,9 +204,9 @@ func (s *ClientStatsManager) Query(query StatsQuery) (StatsResult, error) {
         %[4]s
         WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ?%[5]s
         GROUP BY %[3]s
-        ORDER BY uv DESC
+        ORDER BY %[6]s
         LIMIT ?`,
-		selectExpr, query.WebsiteID, groupExpr, joinClause, extraCondition))
+		selectExpr, query.WebsiteID, groupExpr, joinClause, extraCondition, orderByExpr))
 
 	rows, err := s.repo.GetDB().Query(dbQueryStr, startTime.Unix(), endTime.Unix(), limit)
 	if err != nil {
