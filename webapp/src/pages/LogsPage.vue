@@ -195,6 +195,18 @@
         </div>
         <transition name="filter-collapse">
           <div v-if="advancedFiltersOpen" class="filter-row filter-row-toggles">
+            <div class="filter-input-container filter-input-container-location">
+              <label for="location-filter">{{ t('overview.ipLocation') }}</label>
+              <InputText
+                v-model.trim="locationFilter"
+                inputId="location-filter"
+                class="filter-text-input"
+                :placeholder="t('overview.locationPlaceholder')"
+                @keyup.enter="applyLocationFilterNow"
+                @compositionstart="handleLocationFilterCompositionStart"
+                @compositionend="handleLocationFilterCompositionEnd"
+              />
+            </div>
             <div class="filter-toggle-container">
               <Checkbox v-model="excludeInternal" inputId="exclude-internal" binary />
               <label for="exclude-internal">{{ t('logs.excludeInternal') }}</label>
@@ -840,6 +852,8 @@ const routeWebsiteIdOverride = ref('');
 
 const searchInput = ref('');
 const searchFilter = ref('');
+const locationFilter = ref('');
+const isLocationFilterComposing = ref(false);
 const excludeInternal = ref(false);
 const pageviewOnly = ref(false);
 const excludeSpider = ref(false);
@@ -888,6 +902,9 @@ const exportHistoryLoadingMore = ref(false);
 const exportHistoryTableRef = ref<InstanceType<typeof DataTable> | null>(null);
 let exportHistoryScrollHandler: ((event: Event) => void) | null = null;
 let exportHistoryTimer: ReturnType<typeof setInterval> | null = null;
+const locationFilterDebounceMs = 450;
+let locationFilterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let suppressLocationFilterWatch = false;
 const demoMode = inject<{ value: boolean } | null>('demoMode', null);
 const migrationRequired = inject<{ value: boolean } | null>('migrationRequired', null);
 const migrationAckKey = 'pgMigrationAck';
@@ -1073,6 +1090,7 @@ const hasActiveLogFilters = computed(() =>
   Boolean(currentWebsiteId.value) &&
   Boolean(
     searchFilter.value ||
+    locationFilter.value.trim() ||
     statusCodeFilter.value.trim() ||
     excludeInternal.value ||
     pageviewOnly.value ||
@@ -1190,9 +1208,48 @@ function setStatusCodePreset(preset: string) {
   statusCodeFilter.value = preset;
 }
 
+function clearLocationFilterDebounce() {
+  if (locationFilterDebounceTimer) {
+    clearTimeout(locationFilterDebounceTimer);
+    locationFilterDebounceTimer = null;
+  }
+}
+
+function setLocationFilterSilently(value: string) {
+  suppressLocationFilterWatch = true;
+  locationFilter.value = value;
+}
+
+function scheduleLocationFilterSearch() {
+  clearLocationFilterDebounce();
+  locationFilterDebounceTimer = setTimeout(() => {
+    locationFilterDebounceTimer = null;
+    currentPage.value = 1;
+    loadLogs();
+  }, locationFilterDebounceMs);
+}
+
+function applyLocationFilterNow() {
+  clearLocationFilterDebounce();
+  currentPage.value = 1;
+  loadLogs();
+}
+
+function handleLocationFilterCompositionStart() {
+  isLocationFilterComposing.value = true;
+  clearLocationFilterDebounce();
+}
+
+function handleLocationFilterCompositionEnd() {
+  isLocationFilterComposing.value = false;
+  scheduleLocationFilterSearch();
+}
+
 function clearLogFilters() {
   searchInput.value = '';
   searchFilter.value = '';
+  clearLocationFilterDebounce();
+  setLocationFilterSilently('');
   statusCodeFilter.value = '';
   excludeInternal.value = false;
   pageviewOnly.value = false;
@@ -1234,6 +1291,9 @@ function buildExportParams() {
   }
   if (ipFilter) {
     params.ipFilter = ipFilter;
+  }
+  if (locationFilter.value.trim()) {
+    params.locationFilter = locationFilter.value.trim();
   }
   if (pageviewOnly.value) {
     params.pageviewOnly = true;
@@ -1958,6 +2018,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  clearLocationFilterDebounce();
   stopProgressPolling();
   stopExportPolling();
   stopExportHistoryPolling();
@@ -2051,6 +2112,19 @@ watch([ipParsing, parsingPending, ipGeoParsing, ipGeoPending, currentWebsiteId],
   }
 });
 
+watch(locationFilter, (value) => {
+  saveUserPreference('logsLocationFilter', value || '');
+  if (suppressLocationFilterWatch) {
+    suppressLocationFilterWatch = false;
+    clearLocationFilterDebounce();
+    return;
+  }
+  if (isLocationFilterComposing.value) {
+    return;
+  }
+  scheduleLocationFilterSearch();
+});
+
 watch([sortField, sortOrder, pageSize, excludeInternal, pageviewOnly, excludeSpider, excludeForeign, statusCodeFilter, timeStart, timeEnd], () => {
   saveUserPreference('logsSortField', sortField.value);
   saveUserPreference('logsSortOrder', sortOrder.value);
@@ -2067,6 +2141,7 @@ watch([sortField, sortOrder, pageSize, excludeInternal, pageviewOnly, excludeSpi
 });
 
 function initPreferences() {
+  setLocationFilterSilently(getUserPreference('logsLocationFilter', ''));
   excludeInternal.value = getUserPreference('logsExcludeInternal', 'false') === 'true';
   pageviewOnly.value = getUserPreference('logsPageviewOnly', 'false') === 'true';
   excludeSpider.value = getUserPreference('logsExcludeSpider', 'false') === 'true';
@@ -2095,6 +2170,11 @@ function applyRouteOverrides() {
   if (ipFilter) {
     searchInput.value = ipFilter;
     searchFilter.value = ipFilter;
+  }
+
+  const locationFilterValue = getRouteQueryValue('locationFilter');
+  if (locationFilterValue) {
+    setLocationFilterSilently(locationFilterValue);
   }
 
   const keywordFilter = getRouteQueryValue('filter');
@@ -2156,10 +2236,12 @@ async function loadLogs() {
   if (!currentWebsiteId.value) {
     return;
   }
+  clearLocationFilterDebounce();
   loading.value = true;
   try {
     const { statusCode: statusCodeParam, statusClass: statusClassParam } = resolveStatusParams();
     const ipFilterParam = getIPFilterFromSearch(searchFilter.value) || undefined;
+    const locationFilterParam = locationFilter.value.trim() || undefined;
     const timeStartParam = timeStart.value || undefined;
     const timeEndParam = timeEnd.value || undefined;
     const result = await fetchLogs(
@@ -2176,7 +2258,7 @@ async function loadLogs() {
       ipFilterParam,
       timeStartParam,
       timeEndParam,
-      undefined,
+      locationFilterParam,
       undefined,
       pageviewOnly.value,
       undefined,
@@ -2212,6 +2294,7 @@ async function refreshParsingStatus() {
   try {
     const { statusCode: statusCodeParam, statusClass: statusClassParam } = resolveStatusParams();
     const ipFilterParam = getIPFilterFromSearch(searchFilter.value) || undefined;
+    const locationFilterParam = locationFilter.value.trim() || undefined;
     const timeStartParam = timeStart.value || undefined;
     const timeEndParam = timeEnd.value || undefined;
     const result = await fetchLogs(
@@ -2228,7 +2311,7 @@ async function refreshParsingStatus() {
       ipFilterParam,
       timeStartParam,
       timeEndParam,
-      undefined,
+      locationFilterParam,
       undefined,
       pageviewOnly.value,
       undefined,
@@ -2566,6 +2649,27 @@ function nextPage() {
   background: var(--panel-muted);
   border: 1px solid var(--border);
   gap: 10px;
+}
+
+.filter-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.filter-input-container label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.filter-text-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
 }
 
 .filter-toggle-container {
