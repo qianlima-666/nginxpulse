@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/likaia/nginxpulse/internal/sqlutil"
 	"github.com/likaia/nginxpulse/internal/store"
@@ -43,25 +44,29 @@ func (m *RefererIPBatchStatsManager) Query(query StatsQuery) (StatsResult, error
 	if limit <= 0 {
 		limit = 10
 	}
+	urlFilter := ""
+	if value, ok := query.ExtraParam["urlFilter"].(string); ok {
+		urlFilter = strings.TrimSpace(value)
+	}
 
 	startTime, endTime, err := timeutil.TimePeriod(timeRange)
 	if err != nil {
 		return result, err
 	}
 
-	all, err := m.queryGroup(query.WebsiteID, startTime.Unix(), endTime.Unix(), limit, "all")
+	all, err := m.queryGroup(query.WebsiteID, startTime.Unix(), endTime.Unix(), limit, "all", urlFilter)
 	if err != nil {
 		return result, err
 	}
-	search, err := m.queryGroup(query.WebsiteID, startTime.Unix(), endTime.Unix(), limit, "search")
+	search, err := m.queryGroup(query.WebsiteID, startTime.Unix(), endTime.Unix(), limit, "search", urlFilter)
 	if err != nil {
 		return result, err
 	}
-	direct, err := m.queryGroup(query.WebsiteID, startTime.Unix(), endTime.Unix(), limit, "direct")
+	direct, err := m.queryGroup(query.WebsiteID, startTime.Unix(), endTime.Unix(), limit, "direct", urlFilter)
 	if err != nil {
 		return result, err
 	}
-	external, err := m.queryGroup(query.WebsiteID, startTime.Unix(), endTime.Unix(), limit, "external")
+	external, err := m.queryGroup(query.WebsiteID, startTime.Unix(), endTime.Unix(), limit, "external", urlFilter)
 	if err != nil {
 		return result, err
 	}
@@ -79,6 +84,7 @@ func (m *RefererIPBatchStatsManager) queryGroup(
 	endUnix int64,
 	limit int,
 	sourceKind string,
+	urlFilter string,
 ) (RefererIPGroupStats, error) {
 	result := RefererIPGroupStats{
 		Key:      make([]string, 0),
@@ -93,15 +99,23 @@ func (m *RefererIPBatchStatsManager) queryGroup(
 	if sourceCondition != "" {
 		extraCondition = " AND " + sourceCondition
 	}
+	urlJoin := ""
+	args := []interface{}{startUnix, endUnix}
+	if urlFilter != "" {
+		urlJoin = fmt.Sprintf(`JOIN "%s_dim_url" filter_url ON filter_url.id = l.url_id`, websiteID)
+		extraCondition += " AND filter_url.url LIKE ?"
+		args = append(args, "%"+urlFilter+"%")
+	}
 
 	totalQuery := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
         SELECT COUNT(*)
         FROM "%[1]s_nginx_logs" l
         JOIN "%[1]s_dim_referer" r ON r.id = l.referer_id
-        WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ?%[2]s`,
-		websiteID, extraCondition))
+        %[2]s
+        WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ?%[3]s`,
+		websiteID, urlJoin, extraCondition))
 
-	if err := m.repo.GetDB().QueryRow(totalQuery, startUnix, endUnix).Scan(&result.TotalUV); err != nil {
+	if err := m.repo.GetDB().QueryRow(totalQuery, args...).Scan(&result.TotalUV); err != nil {
 		return result, fmt.Errorf("查询来源IP总量失败: %v", err)
 	}
 
@@ -111,7 +125,8 @@ func (m *RefererIPBatchStatsManager) queryGroup(
             FROM "%[1]s_nginx_logs" l
             JOIN "%[1]s_dim_ip" ip ON ip.id = l.ip_id
             JOIN "%[1]s_dim_referer" r ON r.id = l.referer_id
-            WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ?%[2]s
+            %[2]s
+            WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ?%[3]s
         ),
         ip_counts AS (
             SELECT ip_id, ip, COUNT(*) AS uv
@@ -147,9 +162,11 @@ func (m *RefererIPBatchStatsManager) queryGroup(
         FROM top_ips t
         LEFT JOIN location_rank lr ON lr.ip_id = t.ip_id AND lr.rn = 1
         ORDER BY t.uv DESC, t.ip ASC`,
-		websiteID, extraCondition))
+		websiteID, urlJoin, extraCondition))
 
-	rows, err := m.repo.GetDB().Query(querySQL, startUnix, endUnix, limit)
+	queryArgs := append([]interface{}{}, args...)
+	queryArgs = append(queryArgs, limit)
+	rows, err := m.repo.GetDB().Query(querySQL, queryArgs...)
 	if err != nil {
 		return result, fmt.Errorf("查询来源IP排行失败: %v", err)
 	}

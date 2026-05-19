@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/likaia/nginxpulse/internal/sqlutil"
@@ -131,6 +132,10 @@ func (m *DeveloperDailyStatsManager) Query(query StatsQuery) (StatsResult, error
 	if !ok || timeRange == "" {
 		return result, fmt.Errorf("timeRange 参数缺失")
 	}
+	urlFilter := ""
+	if value, ok := query.ExtraParam["urlFilter"].(string); ok {
+		urlFilter = strings.TrimSpace(value)
+	}
 
 	startTime, _, err := timeutil.TimePeriod(timeRange)
 	if err != nil {
@@ -150,11 +155,11 @@ func (m *DeveloperDailyStatsManager) Query(query StatsQuery) (StatsResult, error
 	result.CurrentDate = currentStart.Format("2006-01-02")
 	result.PreviousDate = prevDayStart.Format("2006-01-02")
 
-	currentSnapshot, err := m.queryDaySnapshot(query.WebsiteID, currentStart, currentEnd)
+	currentSnapshot, err := m.queryDaySnapshot(query.WebsiteID, currentStart, currentEnd, urlFilter)
 	if err != nil {
 		return result, err
 	}
-	prevSnapshot, err := m.queryDaySnapshot(query.WebsiteID, prevDayStart, prevDayEnd)
+	prevSnapshot, err := m.queryDaySnapshot(query.WebsiteID, prevDayStart, prevDayEnd, urlFilter)
 	if err != nil {
 		return result, err
 	}
@@ -180,7 +185,7 @@ func (m *DeveloperDailyStatsManager) Query(query StatsQuery) (StatsResult, error
 	for offset := developerTrendDays - 1; offset >= 0; offset-- {
 		dayStart := currentStart.AddDate(0, 0, -offset)
 		dayEnd := dayStart.AddDate(0, 0, 1)
-		snapshot, err := m.queryDaySnapshot(query.WebsiteID, dayStart, dayEnd)
+		snapshot, err := m.queryDaySnapshot(query.WebsiteID, dayStart, dayEnd, urlFilter)
 		if err != nil {
 			return result, err
 		}
@@ -192,7 +197,7 @@ func (m *DeveloperDailyStatsManager) Query(query StatsQuery) (StatsResult, error
 		result.Trend.SlowRequestRate = append(result.Trend.SlowRequestRate, ratioValue(snapshot.slowRequests, snapshot.totalRequests))
 	}
 
-	topIssues, err := m.queryTopIssues(query.WebsiteID, currentStart, currentEnd, prevDayStart, prevDayEnd)
+	topIssues, err := m.queryTopIssues(query.WebsiteID, currentStart, currentEnd, prevDayStart, prevDayEnd, urlFilter)
 	if err != nil {
 		return result, err
 	}
@@ -204,9 +209,18 @@ func (m *DeveloperDailyStatsManager) Query(query StatsQuery) (StatsResult, error
 func (m *DeveloperDailyStatsManager) queryDaySnapshot(
 	websiteID string,
 	startTime, endTime time.Time,
+	urlFilter string,
 ) (developerDaySnapshot, error) {
 	result := developerDaySnapshot{}
 	tableName := fmt.Sprintf(`"%s_nginx_logs"`, websiteID)
+	urlJoin := ""
+	urlCondition := ""
+	args := []interface{}{developerSlowThresholdMs, startTime.Unix(), endTime.Unix()}
+	if urlFilter != "" {
+		urlJoin = fmt.Sprintf(`JOIN "%s_dim_url" u ON u.id = l.url_id`, websiteID)
+		urlCondition = " AND u.url LIKE ?"
+		args = append(args, "%"+urlFilter+"%")
+	}
 
 	query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
 		SELECT
@@ -220,14 +234,15 @@ func (m *DeveloperDailyStatsManager) queryDaySnapshot(
 			COALESCE(AVG(NULLIF(request_time_ms, 0)), 0) AS avg_request_time_ms,
 			COALESCE(AVG(NULLIF(upstream_response_time_ms, 0)), 0) AS avg_upstream_time_ms,
 			COALESCE(AVG(NULLIF(request_length, 0)), 0) AS avg_request_size_bytes
-		FROM %s
-		WHERE timestamp >= ? AND timestamp < ?`,
-		tableName))
+		FROM %s l
+		%s
+		WHERE l.timestamp >= ? AND l.timestamp < ?%s`,
+		tableName, urlJoin, urlCondition))
 
 	var avgRequestTimeMs sql.NullFloat64
 	var avgUpstreamTimeMs sql.NullFloat64
 	var avgRequestSizeBytes sql.NullFloat64
-	row := m.repo.GetDB().QueryRow(query, developerSlowThresholdMs, startTime.Unix(), endTime.Unix())
+	row := m.repo.GetDB().QueryRow(query, args...)
 	if err := row.Scan(
 		&result.totalRequests,
 		&result.status4xx,
@@ -253,17 +268,26 @@ func (m *DeveloperDailyStatsManager) queryTopIssues(
 	websiteID string,
 	currentStart, currentEnd time.Time,
 	prevStart, prevEnd time.Time,
+	urlFilter string,
 ) ([]DeveloperDailyURLIssue, error) {
-	query := buildDeveloperTopIssuesQuery(websiteID)
-
-	rows, err := m.repo.GetDB().Query(
-		query,
+	query := buildDeveloperTopIssuesQuery(websiteID, urlFilter != "")
+	args := []interface{}{
 		developerSlowThresholdMs,
 		currentStart.Unix(),
 		currentEnd.Unix(),
+	}
+	if urlFilter != "" {
+		args = append(args, "%"+urlFilter+"%")
+	}
+	args = append(args,
 		developerSlowThresholdMs,
 		developerIssueAvgSlowMs,
 		developerIssueLimit,
+	)
+
+	rows, err := m.repo.GetDB().Query(
+		query,
+		args...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("查询开发者日报问题 URL 失败: %v", err)
@@ -297,7 +321,7 @@ func (m *DeveloperDailyStatsManager) queryTopIssues(
 
 	results := make([]DeveloperDailyURLIssue, 0, len(issues))
 	for _, item := range issues {
-		prevItem, err := m.queryIssueForURL(websiteID, prevStart, prevEnd, item.url)
+		prevItem, err := m.queryIssueForURL(websiteID, prevStart, prevEnd, item.url, urlFilter)
 		if err != nil {
 			return nil, err
 		}
@@ -320,14 +344,19 @@ func (m *DeveloperDailyStatsManager) queryIssueForURL(
 	websiteID string,
 	startTime, endTime time.Time,
 	url string,
+	urlFilter string,
 ) (developerIssueRow, error) {
 	result := developerIssueRow{}
 	if url == "" {
 		return result, nil
 	}
-	query := buildDeveloperIssueForURLQuery(websiteID)
+	query := buildDeveloperIssueForURLQuery(websiteID, urlFilter != "")
+	args := []interface{}{developerSlowThresholdMs, startTime.Unix(), endTime.Unix(), url}
+	if urlFilter != "" {
+		args = append(args, "%"+urlFilter+"%")
+	}
 
-	row := m.repo.GetDB().QueryRow(query, developerSlowThresholdMs, startTime.Unix(), endTime.Unix(), url)
+	row := m.repo.GetDB().QueryRow(query, args...)
 	item, err := scanDeveloperIssueRow(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -360,9 +389,13 @@ func scanDeveloperIssueRow(scanner developerIssueScanner) (developerIssueRow, er
 	return item, nil
 }
 
-func buildDeveloperTopIssuesQuery(websiteID string) string {
+func buildDeveloperTopIssuesQuery(websiteID string, withURLFilter bool) string {
 	logTable := fmt.Sprintf(`"%s_nginx_logs"`, websiteID)
 	urlTable := fmt.Sprintf(`"%s_dim_url"`, websiteID)
+	urlCondition := ""
+	if withURLFilter {
+		urlCondition = " AND u.url LIKE ?"
+	}
 	return sqlutil.ReplacePlaceholders(fmt.Sprintf(`
 		SELECT
 			u.url,
@@ -373,7 +406,7 @@ func buildDeveloperTopIssuesQuery(websiteID string) string {
 			COALESCE(MAX(l.request_time_ms), 0) AS max_request_time_ms
 		FROM %s l
 		JOIN %s u ON u.id = l.url_id
-		WHERE l.timestamp >= ? AND l.timestamp < ?
+		WHERE l.timestamp >= ? AND l.timestamp < ?%s
 		GROUP BY u.url
 		HAVING
 			SUM(CASE WHEN l.status_code >= 500 AND l.status_code < 600 THEN 1 ELSE 0 END) > 0
@@ -381,12 +414,16 @@ func buildDeveloperTopIssuesQuery(websiteID string) string {
 			OR COALESCE(AVG(NULLIF(l.request_time_ms, 0)), 0) >= ?
 		ORDER BY errors_5xx DESC, slow_requests DESC, avg_request_time_ms DESC, requests DESC
 		LIMIT ?`,
-		logTable, urlTable))
+		logTable, urlTable, urlCondition))
 }
 
-func buildDeveloperIssueForURLQuery(websiteID string) string {
+func buildDeveloperIssueForURLQuery(websiteID string, withURLFilter bool) string {
 	logTable := fmt.Sprintf(`"%s_nginx_logs"`, websiteID)
 	urlTable := fmt.Sprintf(`"%s_dim_url"`, websiteID)
+	urlCondition := ""
+	if withURLFilter {
+		urlCondition = " AND u.url LIKE ?"
+	}
 	return sqlutil.ReplacePlaceholders(fmt.Sprintf(`
 		SELECT
 			u.url,
@@ -397,9 +434,9 @@ func buildDeveloperIssueForURLQuery(websiteID string) string {
 			COALESCE(MAX(l.request_time_ms), 0) AS max_request_time_ms
 		FROM %s l
 		JOIN %s u ON u.id = l.url_id
-		WHERE l.timestamp >= ? AND l.timestamp < ? AND u.url = ?
+		WHERE l.timestamp >= ? AND l.timestamp < ? AND u.url = ?%s
 		GROUP BY u.url`,
-		logTable, urlTable))
+		logTable, urlTable, urlCondition))
 }
 
 func buildDeveloperMetric(current, previous float64) DeveloperMetric {

@@ -389,6 +389,11 @@ func (f *StatsFactory) BuildQueryFromRequest(
 			query.ExtraParam["entryLimit"] = value
 		}
 	}
+	if statsTypeSupportsURLFilter(statsType) {
+		if urlFilter, ok := params["urlFilter"]; ok && strings.TrimSpace(urlFilter) != "" {
+			query.ExtraParam["urlFilter"] = strings.TrimSpace(urlFilter)
+		}
+	}
 	if statsType == "realtime" {
 		if windowRaw, ok := params["window"]; ok && windowRaw != "" {
 			value, err := strconv.Atoi(windowRaw)
@@ -414,6 +419,26 @@ func (f *StatsFactory) BuildQueryFromRequest(
 	}
 
 	return query, nil
+}
+
+func statsTypeSupportsURLFilter(statsType string) bool {
+	switch statsType {
+	case "timeseries",
+		"overall",
+		"developer_daily",
+		"url",
+		"referer",
+		"referer_ip",
+		"referer_ip_batch",
+		"browser",
+		"os",
+		"device",
+		"location",
+		"session_summary":
+		return true
+	default:
+		return false
+	}
 }
 
 // getRequiredInt 获取并验证必须的整数参数

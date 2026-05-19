@@ -61,6 +61,31 @@
     </div>
   </header>
 
+  <section class="daily-url-filter-row" :class="{ active: activeDailyURLFilter }">
+    <div class="daily-url-filter-copy">
+      <span class="daily-url-filter-label">
+        <i class="ri-links-line" aria-hidden="true"></i>
+        {{ t('common.url') }}
+      </span>
+      <span class="daily-url-filter-status">
+        {{ activeDailyURLFilter ? t('daily.urlSearchActive', { value: activeDailyURLFilter }) : t('daily.urlSearchAll') }}
+      </span>
+    </div>
+    <div class="daily-url-filter-controls">
+      <label class="daily-url-filter" for="daily-url-filter">
+        <i class="ri-search-line" aria-hidden="true"></i>
+        <input
+          id="daily-url-filter"
+          v-model="dailyURLInput"
+          type="search"
+          :placeholder="t('daily.urlSearchPlaceholder')"
+          autocomplete="off"
+          @keyup.enter="applyDailyURLFilter"
+        />
+      </label>
+    </div>
+  </section>
+
   <section class="daily-kpi-grid">
     <div class="card daily-kpi-card">
       <div class="daily-kpi-header">
@@ -255,7 +280,37 @@
           <div class="daily-dev-block-sub">{{ t('daily.devTrendSubtitle') }}</div>
         </div>
         <div class="daily-dev-chart">
-          <canvas v-show="hasDeveloperTrendData" ref="developerTrendChartRef"></canvas>
+          <div v-if="hasDeveloperTrendData" class="daily-dev-pulse-board" role="img" :aria-label="developerTrendAriaLabel">
+            <div
+              v-for="day in developerTrendDays"
+              :key="day.label"
+              class="daily-dev-pulse-day"
+              :class="day.tone"
+              :title="day.title"
+            >
+              <div class="daily-dev-pulse-label">{{ day.label }}</div>
+              <div class="daily-dev-pulse-meter" aria-hidden="true">
+                <span class="daily-dev-pulse-gridline top"></span>
+                <span class="daily-dev-pulse-gridline mid"></span>
+                <span class="daily-dev-pulse-stack">
+                  <span
+                    v-if="day.status4xx > 0"
+                    class="daily-dev-pulse-bar status4xx"
+                    :style="{ height: day.status4xxHeight }"
+                  ></span>
+                  <span
+                    v-if="day.status5xx > 0"
+                    class="daily-dev-pulse-bar status5xx"
+                    :style="{ height: day.status5xxHeight }"
+                  ></span>
+                </span>
+              </div>
+              <div class="daily-dev-pulse-meta">
+                <strong>{{ day.totalText }}</strong>
+                <span>{{ day.latencyText }}</span>
+              </div>
+            </div>
+          </div>
           <div v-if="!hasDeveloperTrendData" class="daily-empty-state">
             <span class="daily-empty-state-icon"><i class="ri-pulse-line"></i></span>
             <div class="daily-empty-state-title">{{ t('daily.devTrendEmptyTitle') }}</div>
@@ -269,57 +324,56 @@
           <div class="daily-dev-block-title">{{ t('daily.devIssueTitle') }}</div>
           <div class="daily-dev-block-sub">{{ t('daily.devIssueSubtitle') }}</div>
         </div>
-        <div class="table-wrapper">
-          <table class="ranking-table">
-            <thead>
-              <tr>
-                <th>{{ t('logs.request') }}</th>
-                <th>{{ t('daily.devIssue5xx') }}</th>
-                <th>{{ t('logs.duration') }}</th>
-                <th>{{ t('daily.devSlowCount') }}</th>
-                <th>{{ t('common.comparePrev') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="!developerIssueRows.length">
-                <td colspan="5">{{ t('daily.devIssueEmpty') }}</td>
-              </tr>
-              <tr v-else v-for="row in developerIssueRows" :key="row.url" class="daily-dev-issue-row">
-                <td class="daily-dev-url-cell">
-                  <button type="button" class="daily-dev-cell-link daily-dev-url-button" @click="goToLogsByIssue(row.url, 'all')">
-                    <div class="daily-dev-url" :title="row.url">{{ row.url }}</div>
-                    <div class="daily-dev-url-meta">{{ t('daily.devIssueRequestCount', { value: row.requestsText }) }}</div>
-                    <div class="daily-dev-cell-cta">{{ t('daily.devViewLogs') }}</div>
-                  </button>
-                </td>
-                <td>
-                  <button type="button" class="daily-dev-cell-link" @click="goToLogsByIssue(row.url, '5xx')">
-                    <div>{{ row.errors5xxText }}</div>
-                    <div class="daily-dev-cell-cta">{{ t('daily.devView5xx') }}</div>
-                  </button>
-                </td>
-                <td>
-                  <button type="button" class="daily-dev-cell-link" @click="goToLogsByIssue(row.url, 'latency')">
-                    <div>{{ row.avgRequestTimeText }}</div>
-                    <div class="daily-dev-cell-hint">{{ t('daily.devMaxDuration', { value: row.maxRequestTimeText }) }}</div>
-                    <div class="daily-dev-cell-cta">{{ t('daily.devViewLatency') }}</div>
-                  </button>
-                </td>
-                <td>
-                  <button type="button" class="daily-dev-cell-link" @click="goToLogsByIssue(row.url, 'slow')">
-                    <div>{{ row.slowRequestsText }}</div>
-                    <div class="daily-dev-cell-cta">{{ t('daily.devViewSlow') }}</div>
-                  </button>
-                </td>
-                <td>
-                  <button type="button" class="daily-dev-cell-link" :class="row.compareClass" @click="goToLogsByIssue(row.url, 'compare')">
-                    <div>{{ row.compareText }}</div>
-                    <div class="daily-dev-cell-cta">{{ t('daily.devViewCompare') }}</div>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="daily-dev-issue-list">
+          <div v-if="!developerIssueRows.length" class="daily-empty-state compact">
+            <span class="daily-empty-state-icon"><i class="ri-checkbox-circle-line"></i></span>
+            <div class="daily-empty-state-title">{{ t('daily.devIssueEmpty') }}</div>
+          </div>
+          <article
+            v-else
+            v-for="(row, index) in developerIssueRows"
+            :key="row.url"
+            class="daily-dev-issue-card"
+            :class="{ critical: row.errors5xx > 0, watch: row.slowRequests > 0 && row.errors5xx <= 0 }"
+          >
+            <button type="button" class="daily-dev-issue-main" @click="goToLogsByIssue(row.url, 'all')">
+              <span class="daily-dev-issue-rank">{{ index + 1 }}</span>
+              <span class="daily-dev-issue-copy">
+                <span class="daily-dev-issue-url" :title="row.url">{{ row.url }}</span>
+                <span class="daily-dev-issue-meta">{{ t('daily.devIssueRequestCount', { value: row.requestsText }) }}</span>
+              </span>
+            </button>
+            <div class="daily-dev-issue-metrics">
+              <button
+                type="button"
+                class="daily-dev-issue-metric danger"
+                :aria-label="t('daily.devView5xx')"
+                @click="goToLogsByIssue(row.url, '5xx')"
+              >
+                <span>{{ t('daily.devIssue5xx') }}</span>
+                <strong>{{ row.errors5xxText }}</strong>
+              </button>
+              <button
+                type="button"
+                class="daily-dev-issue-metric latency"
+                :aria-label="t('daily.devViewLatency')"
+                @click="goToLogsByIssue(row.url, 'latency')"
+              >
+                <span>{{ t('logs.duration') }}</span>
+                <strong>{{ row.avgRequestTimeText }}</strong>
+                <small>{{ t('daily.devMaxDuration', { value: row.maxRequestTimeText }) }}</small>
+              </button>
+              <button
+                type="button"
+                class="daily-dev-issue-metric slow"
+                :aria-label="t('daily.devViewSlow')"
+                @click="goToLogsByIssue(row.url, 'slow')"
+              >
+                <span>{{ t('daily.devSlowCount') }}</span>
+                <strong>{{ row.slowRequestsText }}</strong>
+              </button>
+            </div>
+          </article>
         </div>
         <div class="daily-summary-strip">{{ developerIssueSummary }}</div>
       </div>
@@ -696,6 +750,8 @@ const overall = ref<Record<string, any> | null>(null);
 const sessionSummary = ref<Record<string, any> | null>(null);
 const sessionSummaryPrev = ref<Record<string, any> | null>(null);
 const developerDaily = ref<DeveloperDailyStats | null>(null);
+const dailyURLInput = ref('');
+const activeDailyURLFilter = ref('');
 const timeSeries = ref<TimeSeriesStats | null>(null);
 const refererStats = ref<SimpleSeriesStats | null>(null);
 const refererPrev = ref<SimpleSeriesStats | null>(null);
@@ -719,18 +775,17 @@ const sourceTab = ref<'referer' | 'search' | 'ip'>('referer');
 const sourceIPTab = ref<SourceIPKind>('all');
 
 const ipChartRef = ref<HTMLCanvasElement | null>(null);
-const developerTrendChartRef = ref<HTMLCanvasElement | null>(null);
 const sourceChartRef = ref<HTMLCanvasElement | null>(null);
 const visitorChartRef = ref<HTMLCanvasElement | null>(null);
 const deviceChartRef = ref<HTMLCanvasElement | null>(null);
 
 let ipChart: Chart | null = null;
-let developerTrendChart: Chart | null = null;
 let sourceChart: Chart | null = null;
 let visitorChart: Chart | null = null;
 let deviceChart: Chart | null = null;
 
 let dailyRequestId = 0;
+let dailyURLDebounceTimer: ReturnType<typeof window.setTimeout> | null = null;
 
 const trendSummary = computed(() => {
   if (!timeSeries.value || !timeSeries.value.labels) {
@@ -931,11 +986,6 @@ const developerIssueRows = computed(() =>
     errors5xxText: formatNumber(item.errors5xx),
     avgRequestTimeText: formatMs(item.avgRequestTimeMs),
     slowRequestsText: formatNumber(item.slowRequests),
-    compareText: t('daily.devIssueCompare', {
-      errors: formatSigned(item.errors5xxDelta),
-      duration: formatSignedMs(item.avgRequestTimeDeltaMs),
-    }),
-    compareClass: deltaClass(Math.max(item.errors5xxDelta, item.avgRequestTimeDeltaMs)),
     maxRequestTimeText: formatMs(item.maxRequestTimeMs),
   }))
 );
@@ -1034,6 +1084,52 @@ const hasDeveloperTrendData = computed(() => {
     trend.avgUpstreamTimeMs,
   ].some((series) => hasPositiveSeriesValues(series));
 });
+const developerTrendDays = computed(() => {
+  const trend = developerDaily.value?.trend;
+  const labels = trend?.labels || [];
+  const status4xx = trend?.status4xx || [];
+  const status5xx = trend?.status5xx || [];
+  const avgRequestTimeMs = trend?.avgRequestTimeMs || [];
+  const avgUpstreamTimeMs = trend?.avgUpstreamTimeMs || [];
+  const totals = labels.map((_, idx) => Number(status4xx[idx] || 0) + Number(status5xx[idx] || 0));
+  const maxTotal = Math.max(1, ...totals);
+
+  return labels.map((label, idx) => {
+    const current4xx = Number(status4xx[idx] || 0);
+    const current5xx = Number(status5xx[idx] || 0);
+    const total = current4xx + current5xx;
+    const latency = Math.max(Number(avgRequestTimeMs[idx] || 0), Number(avgUpstreamTimeMs[idx] || 0));
+    const totalHeight = total > 0 ? Math.max(18, Math.round((total / maxTotal) * 132)) : 6;
+    const status5xxShare = total > 0 ? current5xx / total : 0;
+    const status5xxHeight = current5xx > 0 ? Math.max(5, Math.round(totalHeight * status5xxShare)) : 0;
+    const status4xxHeight = Math.max(total > 0 ? 8 : 0, totalHeight - status5xxHeight);
+    const tone = current5xx > 0 ? 'critical' : total > 0 ? 'watch' : 'quiet';
+
+    return {
+      label,
+      status4xx: current4xx,
+      status5xx: current5xx,
+      status4xxHeight: `${status4xxHeight}px`,
+      status5xxHeight: `${status5xxHeight}px`,
+      totalText: formatNumber(total),
+      latencyText: formatMs(latency),
+      tone,
+      title: t('daily.devTrendDayTitle', {
+        date: label,
+        errors: formatNumber(total),
+        status5xx: formatNumber(current5xx),
+        latency: formatMs(latency),
+      }),
+    };
+  });
+});
+const developerTrendAriaLabel = computed(() => {
+  const days = developerTrendDays.value;
+  if (!days.length) {
+    return t('daily.devTrendEmptyTitle');
+  }
+  return days.map((day) => day.title).join('; ');
+});
 const hasSourceDistributionData = computed(() => Object.values(sourceGroups.value).some((value) => value > 0));
 const hasVisitorDistributionData = computed(() => {
   const current = overall.value || {};
@@ -1061,6 +1157,10 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  if (dailyURLDebounceTimer) {
+    window.clearTimeout(dailyURLDebounceTimer);
+    dailyURLDebounceTimer = null;
+  }
   destroyCharts();
 });
 
@@ -1083,6 +1183,10 @@ watch(currentDate, (value) => {
   loadDailyReport();
 });
 
+watch(dailyURLInput, () => {
+  scheduleDailyURLFilter();
+});
+
 watch(
   timeSeries,
   async (stats) => {
@@ -1092,15 +1196,6 @@ watch(
     }
     await nextTick();
     renderTrend(stats);
-  },
-  { flush: 'post' }
-);
-
-watch(
-  developerDaily,
-  async (stats) => {
-    await nextTick();
-    renderDeveloperTrend(stats?.trend || null);
   },
   { flush: 'post' }
 );
@@ -1202,28 +1297,29 @@ async function loadDailyReport() {
   const requestId = ++dailyRequestId;
   const dateStr = currentDate.value;
   const prevDate = shiftDate(dateStr, -1);
+  const urlFilter = activeDailyURLFilter.value;
 
   try {
     const requests = await Promise.allSettled([
-      fetchOverallStats(currentWebsiteId.value, dateStr),
-      fetchSessionSummary(currentWebsiteId.value, dateStr),
-      fetchSessionSummary(currentWebsiteId.value, prevDate),
-      fetchDeveloperDailyStats(currentWebsiteId.value, dateStr),
-      fetchTimeSeriesStats(currentWebsiteId.value, prevDate, 'hourly'),
-      fetchRefererStats(currentWebsiteId.value, dateStr, 10),
-      fetchRefererStats(currentWebsiteId.value, prevDate, 10),
-      fetchRefererIPBatchStats(currentWebsiteId.value, dateStr, 10),
-      fetchRefererIPBatchStats(currentWebsiteId.value, prevDate, 10),
-      fetchUrlStats(currentWebsiteId.value, dateStr, 10),
-      fetchUrlStats(currentWebsiteId.value, prevDate, 10),
-      fetchDeviceStats(currentWebsiteId.value, dateStr, 10),
-      fetchDeviceStats(currentWebsiteId.value, prevDate, 10),
-      fetchOSStats(currentWebsiteId.value, dateStr, 10),
-      fetchOSStats(currentWebsiteId.value, prevDate, 10),
-      fetchBrowserStats(currentWebsiteId.value, dateStr, 10),
-      fetchBrowserStats(currentWebsiteId.value, prevDate, 10),
-      fetchLocationStats(currentWebsiteId.value, dateStr, 'city', 10),
-      fetchLocationStats(currentWebsiteId.value, prevDate, 'city', 10),
+      fetchOverallStats(currentWebsiteId.value, dateStr, undefined, urlFilter),
+      fetchSessionSummary(currentWebsiteId.value, dateStr, urlFilter),
+      fetchSessionSummary(currentWebsiteId.value, prevDate, urlFilter),
+      fetchDeveloperDailyStats(currentWebsiteId.value, dateStr, urlFilter),
+      fetchTimeSeriesStats(currentWebsiteId.value, prevDate, 'hourly', urlFilter),
+      fetchRefererStats(currentWebsiteId.value, dateStr, 10, urlFilter),
+      fetchRefererStats(currentWebsiteId.value, prevDate, 10, urlFilter),
+      fetchRefererIPBatchStats(currentWebsiteId.value, dateStr, 10, urlFilter),
+      fetchRefererIPBatchStats(currentWebsiteId.value, prevDate, 10, urlFilter),
+      fetchUrlStats(currentWebsiteId.value, dateStr, 10, urlFilter),
+      fetchUrlStats(currentWebsiteId.value, prevDate, 10, urlFilter),
+      fetchDeviceStats(currentWebsiteId.value, dateStr, 10, urlFilter),
+      fetchDeviceStats(currentWebsiteId.value, prevDate, 10, urlFilter),
+      fetchOSStats(currentWebsiteId.value, dateStr, 10, urlFilter),
+      fetchOSStats(currentWebsiteId.value, prevDate, 10, urlFilter),
+      fetchBrowserStats(currentWebsiteId.value, dateStr, 10, urlFilter),
+      fetchBrowserStats(currentWebsiteId.value, prevDate, 10, urlFilter),
+      fetchLocationStats(currentWebsiteId.value, dateStr, 'city', 10, urlFilter),
+      fetchLocationStats(currentWebsiteId.value, prevDate, 'city', 10, urlFilter),
     ]);
 
     if (requestId !== dailyRequestId) {
@@ -1282,6 +1378,29 @@ async function loadDailyReport() {
   }
 }
 
+function scheduleDailyURLFilter() {
+  if (dailyURLDebounceTimer) {
+    window.clearTimeout(dailyURLDebounceTimer);
+  }
+  dailyURLDebounceTimer = window.setTimeout(() => {
+    dailyURLDebounceTimer = null;
+    applyDailyURLFilter();
+  }, 450);
+}
+
+function applyDailyURLFilter() {
+  if (dailyURLDebounceTimer) {
+    window.clearTimeout(dailyURLDebounceTimer);
+    dailyURLDebounceTimer = null;
+  }
+  const normalized = dailyURLInput.value.trim();
+  if (normalized === activeDailyURLFilter.value) {
+    return;
+  }
+  activeDailyURLFilter.value = normalized;
+  loadDailyReport();
+}
+
 function renderTrend(stats: TimeSeriesStats | null) {
   if (ipChart) {
     ipChart.destroy();
@@ -1325,153 +1444,6 @@ function renderTrend(stats: TimeSeriesStats | null) {
         y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148, 163, 184, 0.2)' } },
       },
       plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-    },
-  });
-}
-
-function renderDeveloperTrend(stats: DeveloperDailyStats['trend'] | null) {
-  if (developerTrendChart) {
-    developerTrendChart.destroy();
-    developerTrendChart = null;
-  }
-  if (!developerTrendChartRef.value || !stats) {
-    return;
-  }
-  const hasTrendData = [
-    stats.status4xx,
-    stats.status5xx,
-    stats.avgRequestTimeMs,
-    stats.avgUpstreamTimeMs,
-  ].some((series) => hasPositiveSeriesValues(series));
-  if (!hasTrendData) {
-    return;
-  }
-  const ctx = developerTrendChartRef.value.getContext('2d');
-  if (!ctx) {
-    return;
-  }
-  const labels = stats?.labels || [];
-  const status4xx = stats?.status4xx || [];
-  const status5xx = stats?.status5xx || [];
-  const avgRequestTimeMs = stats?.avgRequestTimeMs || [];
-  const avgUpstreamTimeMs = stats?.avgUpstreamTimeMs || [];
-  const gradient = ctx.createLinearGradient(0, 0, 0, developerTrendChartRef.value.height || 220);
-  gradient.addColorStop(0, 'rgba(30, 123, 255, 0.28)');
-  gradient.addColorStop(1, 'rgba(30, 123, 255, 0.04)');
-  const upstreamGradient = ctx.createLinearGradient(0, 0, 0, developerTrendChartRef.value.height || 220);
-  upstreamGradient.addColorStop(0, 'rgba(20, 184, 166, 0.22)');
-  upstreamGradient.addColorStop(1, 'rgba(20, 184, 166, 0.02)');
-
-  developerTrendChart = new Chart(ctx, {
-    data: {
-      labels,
-      datasets: [
-        {
-          type: 'bar',
-          label: t('daily.dev4xxTrend'),
-          data: status4xx,
-          backgroundColor: 'rgba(249, 115, 22, 0.24)',
-          borderColor: 'rgba(249, 115, 22, 0.68)',
-          borderRadius: 10,
-          borderSkipped: false,
-          yAxisID: 'yErrors',
-          stack: 'status',
-          order: 3,
-        },
-        {
-          type: 'bar',
-          label: t('daily.dev5xxTrend'),
-          data: status5xx,
-          backgroundColor: 'rgba(239, 68, 68, 0.28)',
-          borderColor: 'rgba(239, 68, 68, 0.72)',
-          borderRadius: 10,
-          borderSkipped: false,
-          yAxisID: 'yErrors',
-          stack: 'status',
-          order: 3,
-        },
-        {
-          type: 'line',
-          label: t('daily.devLatencyTrend'),
-          data: avgRequestTimeMs,
-          borderColor: '#1e7bff',
-          backgroundColor: gradient,
-          borderWidth: 2,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          pointBackgroundColor: '#1e7bff',
-          tension: 0.35,
-          fill: true,
-          yAxisID: 'yLatency',
-          order: 1,
-        },
-        {
-          type: 'line',
-          label: t('daily.devUpstreamTrend'),
-          data: avgUpstreamTimeMs,
-          borderColor: '#14b8a6',
-          backgroundColor: upstreamGradient,
-          borderWidth: 2,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-          pointBackgroundColor: '#14b8a6',
-          tension: 0.32,
-          borderDash: [6, 4],
-          fill: false,
-          yAxisID: 'yLatency',
-          order: 2,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index',
-        intersect: false,
-      },
-      scales: {
-        x: {
-          stacked: true,
-          ticks: { color: '#94a3b8', maxTicksLimit: 7 },
-          grid: { display: false },
-        },
-        yLatency: {
-          position: 'left',
-          ticks: {
-            color: '#94a3b8',
-            callback: (value) => formatAxisMs(Number(value)),
-          },
-          grid: { color: 'rgba(148, 163, 184, 0.18)' },
-        },
-        yErrors: {
-          position: 'right',
-          beginAtZero: true,
-          ticks: { color: '#94a3b8', precision: 0 },
-          stacked: true,
-          grid: { drawOnChartArea: false },
-        },
-      },
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            boxWidth: 10,
-            boxHeight: 10,
-            usePointStyle: true,
-          },
-        },
-        tooltip: {
-          callbacks: {
-            label: (context) => {
-              if (context.dataset.yAxisID === 'yLatency') {
-                return `${context.dataset.label}: ${formatMs(Number(context.raw || 0))}`;
-              }
-              return `${context.dataset.label}: ${formatNumber(Number(context.raw || 0))}`;
-            },
-          },
-        },
-      },
     },
   });
 }
@@ -1589,10 +1561,6 @@ function destroyCharts() {
   if (ipChart) {
     ipChart.destroy();
     ipChart = null;
-  }
-  if (developerTrendChart) {
-    developerTrendChart.destroy();
-    developerTrendChart = null;
   }
   if (sourceChart) {
     sourceChart.destroy();
@@ -2011,13 +1979,6 @@ function formatSignedMs(value: number) {
   return `${prefix}${formatMs(Math.abs(value))}`;
 }
 
-function formatAxisMs(value: number) {
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)}s`;
-  }
-  return `${Math.round(value)}ms`;
-}
-
 function formatDuration(seconds: number) {
   const total = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(total / 3600);
@@ -2420,6 +2381,11 @@ function buildDayTimeRange(dateStr: string) {
   text-align: center;
 }
 
+.daily-empty-state.compact {
+  min-height: 132px;
+  padding: 18px;
+}
+
 .daily-empty-state-icon {
   width: 44px;
   height: 44px;
@@ -2481,6 +2447,101 @@ function buildDayTimeRange(dateStr: string) {
 .daily-dev-subtitle {
   margin-top: -8px;
   font-size: 13px;
+  color: var(--muted);
+}
+
+.daily-url-filter-row {
+  min-height: 56px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(248, 250, 255, 0.66));
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(280px, 1.2fr);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+}
+
+.daily-url-filter-row.active {
+  border-color: rgba(var(--primary-color-rgb), 0.28);
+  box-shadow: 0 10px 24px rgba(30, 123, 255, 0.08);
+}
+
+.daily-url-filter-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.daily-url-filter-label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.daily-url-filter-label i {
+  font-size: 16px;
+  color: var(--primary);
+}
+
+.daily-url-filter-controls {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daily-url-filter {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.16);
+  background: rgba(255, 255, 255, 0.78);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--muted);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.daily-url-filter:focus-within {
+  border-color: rgba(var(--primary-color-rgb), 0.42);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.12);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.daily-url-filter i {
+  flex: 0 0 auto;
+  font-size: 16px;
+}
+
+.daily-url-filter input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.daily-url-filter input::placeholder {
+  color: var(--muted);
+}
+
+.daily-url-filter-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -2791,15 +2852,19 @@ function buildDayTimeRange(dateStr: string) {
 .daily-dev-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: stretch;
   gap: 16px;
 }
 
 .daily-dev-chart-card,
 .daily-dev-table-card {
+  min-height: 100%;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(var(--primary-color-rgb), 0.12);
   background: rgba(255, 255, 255, 0.72);
   padding: 16px;
+  display: flex;
+  flex-direction: column;
 }
 
 .daily-dev-block-header {
@@ -2821,56 +2886,271 @@ function buildDayTimeRange(dateStr: string) {
 }
 
 .daily-dev-chart {
-  height: 260px;
+  flex: 1;
+  min-height: 292px;
+  height: auto;
 }
 
-.daily-dev-issue-row {
-  cursor: default;
+.daily-dev-pulse-board {
+  height: 100%;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.daily-dev-url-cell {
+.daily-dev-pulse-day {
   min-width: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.78));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+  padding: 8px;
 }
 
-.daily-dev-cell-link {
-  width: 100%;
-  border: none;
-  background: transparent;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  color: inherit;
+.daily-dev-pulse-day.watch {
+  border-color: rgba(251, 146, 60, 0.28);
+  background: linear-gradient(180deg, rgba(255, 247, 237, 0.82), rgba(255, 255, 255, 0.78));
 }
 
-.daily-dev-cell-link:hover .daily-dev-cell-cta,
-.daily-dev-cell-link:hover .daily-dev-url,
-.daily-dev-cell-link:hover {
-  color: var(--primary);
+.daily-dev-pulse-day.critical {
+  border-color: rgba(248, 113, 113, 0.32);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.88), rgba(255, 255, 255, 0.78));
 }
 
-.daily-dev-url-button {
-  display: block;
-}
-
-.daily-dev-url {
+.daily-dev-pulse-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
 }
 
-.daily-dev-url-meta,
-.daily-dev-cell-hint {
-  margin-top: 4px;
-  font-size: 12px;
+.daily-dev-pulse-meter {
+  position: relative;
+  min-height: 118px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.26), rgba(241, 245, 249, 0.38)),
+    radial-gradient(circle at bottom, rgba(var(--primary-color-rgb), 0.07), transparent 62%);
+}
+
+.daily-dev-pulse-gridline {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.daily-dev-pulse-gridline.top {
+  top: 26%;
+}
+
+.daily-dev-pulse-gridline.mid {
+  top: 58%;
+}
+
+.daily-dev-pulse-stack {
+  position: relative;
+  z-index: 1;
+  width: min(38px, 54%);
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  justify-content: flex-start;
+  border-radius: 999px 999px 8px 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 22px rgba(251, 146, 60, 0.13);
+}
+
+.daily-dev-pulse-bar {
+  display: block;
+  min-height: 0;
+}
+
+.daily-dev-pulse-bar.status4xx {
+  background: linear-gradient(180deg, rgba(251, 146, 60, 0.46), rgba(253, 186, 116, 0.2));
+  border: 1px solid rgba(251, 146, 60, 0.42);
+}
+
+.daily-dev-pulse-bar.status5xx {
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.72), rgba(254, 202, 202, 0.42));
+  border: 1px solid rgba(239, 68, 68, 0.62);
+  border-bottom: 0;
+}
+
+.daily-dev-pulse-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
   color: var(--muted);
 }
 
-.daily-dev-cell-cta {
-  margin-top: 4px;
+.daily-dev-pulse-meta strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.daily-dev-issue-list {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.daily-dev-issue-card {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(260px, 1.08fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.76)),
+    radial-gradient(circle at right bottom, rgba(var(--primary-color-rgb), 0.06), transparent 42%);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+}
+
+.daily-dev-issue-card.critical {
+  border-color: rgba(248, 113, 113, 0.28);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 237, 0.66)),
+    radial-gradient(circle at right bottom, rgba(248, 113, 113, 0.08), transparent 46%);
+}
+
+.daily-dev-issue-card.watch {
+  border-color: rgba(251, 146, 60, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 251, 235, 0.68)),
+    radial-gradient(circle at right bottom, rgba(251, 146, 60, 0.08), transparent 46%);
+}
+
+.daily-dev-issue-main,
+.daily-dev-issue-metric {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.daily-dev-issue-main {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 0;
+  text-align: left;
+}
+
+.daily-dev-issue-rank {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(var(--primary-color-rgb), 0.1);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.daily-dev-issue-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.daily-dev-issue-url {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.daily-dev-issue-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.daily-dev-issue-metrics {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.daily-dev-issue-metric {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-height: 48px;
+  padding: 7px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 12px;
+  text-align: left;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.daily-dev-issue-metric span,
+.daily-dev-issue-metric small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 11px;
   font-weight: 700;
   color: var(--muted);
+}
+
+.daily-dev-issue-metric strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 850;
+  color: var(--text);
+}
+
+.daily-dev-issue-metric.danger strong {
+  color: #ef4444;
+}
+
+.daily-dev-issue-metric.latency strong {
+  color: #2563eb;
+}
+
+.daily-dev-issue-metric.slow strong {
+  color: #f97316;
+}
+
+.daily-dev-issue-main:hover .daily-dev-issue-url,
+.daily-dev-issue-metric:hover {
+  color: var(--primary);
+  border-color: rgba(var(--primary-color-rgb), 0.26);
+  background: rgba(var(--primary-color-rgb), 0.06);
 }
 
 :global(body.dark-mode) .daily-dev-section {
@@ -2963,18 +3243,121 @@ function buildDayTimeRange(dateStr: string) {
 }
 
 :global(body.dark-mode) .daily-dev-subtitle,
+:global(body.dark-mode) .daily-url-filter-status,
 :global(body.dark-mode) .daily-dev-pill-label,
 :global(body.dark-mode) .daily-dev-block-sub,
-:global(body.dark-mode) .daily-dev-url-meta,
-:global(body.dark-mode) .daily-dev-cell-hint,
-:global(body.dark-mode) .daily-dev-cell-cta {
+:global(body.dark-mode) .daily-dev-issue-meta,
+:global(body.dark-mode) .daily-dev-issue-metric span,
+:global(body.dark-mode) .daily-dev-issue-metric small {
   color: rgba(148, 163, 184, 0.92);
+}
+
+:global(body.dark-mode) .daily-dev-issue-card {
+  border-color: rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.58)),
+    radial-gradient(circle at right bottom, rgba(var(--primary-color-rgb), 0.12), transparent 44%);
+}
+
+:global(body.dark-mode) .daily-dev-issue-card.critical {
+  border-color: rgba(248, 113, 113, 0.28);
+  background:
+    linear-gradient(135deg, rgba(69, 10, 10, 0.36), rgba(15, 23, 42, 0.62)),
+    radial-gradient(circle at right bottom, rgba(248, 113, 113, 0.1), transparent 46%);
+}
+
+:global(body.dark-mode) .daily-dev-issue-card.watch {
+  border-color: rgba(251, 146, 60, 0.24);
+  background:
+    linear-gradient(135deg, rgba(67, 35, 12, 0.36), rgba(15, 23, 42, 0.62)),
+    radial-gradient(circle at right bottom, rgba(251, 146, 60, 0.1), transparent 46%);
+}
+
+:global(body.dark-mode) .daily-dev-issue-url,
+:global(body.dark-mode) .daily-dev-issue-metric strong {
+  color: rgba(241, 245, 249, 0.96);
+}
+
+:global(body.dark-mode) .daily-dev-issue-metric.danger strong {
+  color: #fca5a5;
+}
+
+:global(body.dark-mode) .daily-dev-issue-metric.latency strong {
+  color: #93c5fd;
+}
+
+:global(body.dark-mode) .daily-dev-issue-metric.slow strong {
+  color: #fdba74;
+}
+
+:global(body.dark-mode) .daily-dev-issue-rank {
+  background: rgba(var(--primary-color-rgb), 0.18);
+}
+
+:global(body.dark-mode) .daily-dev-issue-metric {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.28);
+}
+
+:global(body.dark-mode) .daily-dev-issue-main:hover .daily-dev-issue-url,
+:global(body.dark-mode) .daily-dev-issue-metric:hover {
+  border-color: rgba(var(--primary-color-rgb), 0.32);
+  background: rgba(var(--primary-color-rgb), 0.14);
+}
+
+:global(body.dark-mode) .daily-dev-pulse-day {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.58));
+}
+
+:global(body.dark-mode) .daily-dev-pulse-day.watch {
+  border-color: rgba(251, 146, 60, 0.22);
+  background: linear-gradient(180deg, rgba(67, 35, 12, 0.48), rgba(15, 23, 42, 0.62));
+}
+
+:global(body.dark-mode) .daily-dev-pulse-day.critical {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: linear-gradient(180deg, rgba(69, 10, 10, 0.46), rgba(15, 23, 42, 0.62));
+}
+
+:global(body.dark-mode) .daily-dev-pulse-meter {
+  background:
+    linear-gradient(180deg, rgba(30, 41, 59, 0.24), rgba(15, 23, 42, 0.44)),
+    radial-gradient(circle at bottom, rgba(var(--primary-color-rgb), 0.1), transparent 62%);
+}
+
+:global(body.dark-mode) .daily-dev-pulse-meta strong {
+  color: rgba(241, 245, 249, 0.94);
 }
 
 :global(body.dark-mode) .daily-dev-pill {
   border-color: rgba(148, 163, 184, 0.18);
   background: rgba(15, 23, 42, 0.54);
   color: rgba(241, 245, 249, 0.94);
+}
+
+:global(body.dark-mode) .daily-url-filter-row {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.58));
+}
+
+:global(body.dark-mode) .daily-url-filter-row.active {
+  border-color: rgba(var(--primary-color-rgb), 0.28);
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.24);
+}
+
+:global(body.dark-mode) .daily-url-filter-label {
+  color: rgba(241, 245, 249, 0.94);
+}
+
+:global(body.dark-mode) .daily-url-filter {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.62);
+}
+
+:global(body.dark-mode) .daily-url-filter:focus-within {
+  border-color: rgba(var(--primary-color-rgb), 0.36);
+  background: rgba(15, 23, 42, 0.82);
 }
 
 :global(body.dark-mode) .daily-empty-state {
@@ -3400,6 +3783,20 @@ function buildDayTimeRange(dateStr: string) {
     grid-template-columns: 1fr;
   }
 
+  .daily-dev-pulse-board {
+    grid-template-columns: repeat(7, minmax(96px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .daily-dev-chart {
+    min-height: 280px;
+  }
+
+  .daily-dev-issue-card {
+    grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.1fr);
+  }
+
   .daily-mini-card {
     grid-column: span 6;
   }
@@ -3451,6 +3848,38 @@ function buildDayTimeRange(dateStr: string) {
   .daily-dev-status-meta {
     margin-left: 22px;
     padding-left: 0;
+  }
+
+  .daily-dev-issue-card {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-dev-chart {
+    min-height: 260px;
+  }
+
+  .daily-dev-issue-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-dev-issue-metric {
+    min-height: auto;
+  }
+
+  .daily-url-filter-row,
+  .daily-url-filter-copy,
+  .daily-url-filter-controls,
+  .daily-url-filter {
+    width: 100%;
+  }
+
+  .daily-url-filter-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .daily-url-filter-status {
+    white-space: normal;
   }
 
   .daily-date-control {

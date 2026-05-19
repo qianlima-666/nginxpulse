@@ -146,6 +146,10 @@ func (s *ClientStatsManager) Query(query StatsQuery) (StatsResult, error) {
 	if err != nil {
 		return result, err
 	}
+	urlFilter := ""
+	if value, ok := query.ExtraParam["urlFilter"].(string); ok {
+		urlFilter = strings.TrimSpace(value)
+	}
 
 	extraCondition := ""
 	switch s.statsType {
@@ -190,7 +194,15 @@ func (s *ClientStatsManager) Query(query StatsQuery) (StatsResult, error) {
 		}
 	}
 	if s.statsType == "location" && (locationType == "domestic" || locationType == "city") {
-		extraCondition = " AND loc.global = '中国'"
+		extraCondition += " AND loc.global = '中国'"
+	}
+	if urlFilter != "" {
+		if s.statsType == "url" {
+			extraCondition += " AND u.url LIKE ?"
+		} else {
+			joinClause += fmt.Sprintf(` JOIN "%s_dim_url" filter_url ON filter_url.id = l.url_id`, query.WebsiteID)
+			extraCondition += " AND filter_url.url LIKE ?"
+		}
 	}
 
 	// 构建、执行查询
@@ -208,7 +220,12 @@ func (s *ClientStatsManager) Query(query StatsQuery) (StatsResult, error) {
         LIMIT ?`,
 		selectExpr, query.WebsiteID, groupExpr, joinClause, extraCondition, orderByExpr))
 
-	rows, err := s.repo.GetDB().Query(dbQueryStr, startTime.Unix(), endTime.Unix(), limit)
+	args := []interface{}{startTime.Unix(), endTime.Unix()}
+	if urlFilter != "" {
+		args = append(args, "%"+urlFilter+"%")
+	}
+	args = append(args, limit)
+	rows, err := s.repo.GetDB().Query(dbQueryStr, args...)
 	if err != nil {
 		return result, fmt.Errorf("查询客户端统计失败: %v", err)
 	}

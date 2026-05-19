@@ -193,31 +193,36 @@ const fetchStats = async <T>(type: string, params: Record<string, unknown> = {})
 export const fetchTimeSeriesStats = (
   websiteId: string,
   timeRange: string,
-  viewType: string
-): Promise<TimeSeriesStats> => fetchStats('timeseries', { id: websiteId, timeRange, viewType });
+  viewType: string,
+  urlFilter?: string
+): Promise<TimeSeriesStats> => fetchStats('timeseries', { id: websiteId, timeRange, viewType, urlFilter });
 
 export const fetchOverallStats = (
   websiteId: string,
   timeRange: string,
-  entryLimit?: number
-): Promise<Record<string, any>> => fetchStats('overall', { id: websiteId, timeRange, entryLimit });
+  entryLimit?: number,
+  urlFilter?: string
+): Promise<Record<string, any>> => fetchStats('overall', { id: websiteId, timeRange, entryLimit, urlFilter });
 
 export const fetchDeveloperDailyStats = (
   websiteId: string,
-  timeRange: string
-): Promise<DeveloperDailyStats> => fetchStats('developer_daily', { id: websiteId, timeRange });
+  timeRange: string,
+  urlFilter?: string
+): Promise<DeveloperDailyStats> => fetchStats('developer_daily', { id: websiteId, timeRange, urlFilter });
 
 export const fetchUrlStats = (
   websiteId: string,
   timeRange: string,
-  limit = 10
-): Promise<SimpleSeriesStats> => fetchStats('url', { id: websiteId, timeRange, limit });
+  limit = 10,
+  urlFilter?: string
+): Promise<SimpleSeriesStats> => fetchStats('url', { id: websiteId, timeRange, limit, urlFilter });
 
 export const fetchRefererStats = (
   websiteId: string,
   timeRange: string,
-  limit = 10
-): Promise<SimpleSeriesStats> => fetchStats('referer', { id: websiteId, timeRange, limit });
+  limit = 10,
+  urlFilter?: string
+): Promise<SimpleSeriesStats> => fetchStats('referer', { id: websiteId, timeRange, limit, urlFilter });
 
 export const fetchRefererIPStats = (
   websiteId: string,
@@ -229,39 +234,45 @@ export const fetchRefererIPStats = (
 export const fetchRefererIPBatchStats = (
   websiteId: string,
   timeRange: string,
-  limit = 10
-): Promise<RefererIPBatchStats> => fetchStats('referer_ip_batch', { id: websiteId, timeRange, limit });
+  limit = 10,
+  urlFilter?: string
+): Promise<RefererIPBatchStats> => fetchStats('referer_ip_batch', { id: websiteId, timeRange, limit, urlFilter });
 
 export const fetchBrowserStats = (
   websiteId: string,
   timeRange: string,
-  limit = 10
-): Promise<SimpleSeriesStats> => fetchStats('browser', { id: websiteId, timeRange, limit });
+  limit = 10,
+  urlFilter?: string
+): Promise<SimpleSeriesStats> => fetchStats('browser', { id: websiteId, timeRange, limit, urlFilter });
 
 export const fetchOSStats = (
   websiteId: string,
   timeRange: string,
-  limit = 10
-): Promise<SimpleSeriesStats> => fetchStats('os', { id: websiteId, timeRange, limit });
+  limit = 10,
+  urlFilter?: string
+): Promise<SimpleSeriesStats> => fetchStats('os', { id: websiteId, timeRange, limit, urlFilter });
 
 export const fetchDeviceStats = (
   websiteId: string,
   timeRange: string,
-  limit = 10
-): Promise<SimpleSeriesStats> => fetchStats('device', { id: websiteId, timeRange, limit });
+  limit = 10,
+  urlFilter?: string
+): Promise<SimpleSeriesStats> => fetchStats('device', { id: websiteId, timeRange, limit, urlFilter });
 
 export const fetchLocationStats = (
   websiteId: string,
   timeRange: string,
   locationType: string,
-  limit = 99
+  limit = 99,
+  urlFilter?: string
 ): Promise<SimpleSeriesStats> =>
-  fetchStats('location', { id: websiteId, locationType, timeRange, limit });
+  fetchStats('location', { id: websiteId, locationType, timeRange, limit, urlFilter });
 
 export const fetchSessionSummary = (
   websiteId: string,
-  timeRange: string
-): Promise<Record<string, any>> => fetchStats('session_summary', { id: websiteId, timeRange });
+  timeRange: string,
+  urlFilter?: string
+): Promise<Record<string, any>> => fetchStats('session_summary', { id: websiteId, timeRange, urlFilter });
 
 export const fetchRealtimeStats = (
   websiteId: string,

@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/likaia/nginxpulse/internal/sqlutil"
 	"github.com/likaia/nginxpulse/internal/store"
@@ -41,16 +42,29 @@ func (m *SessionSummaryStatsManager) Query(query StatsQuery) (StatsResult, error
 	if err != nil {
 		return result, fmt.Errorf("解析时间范围失败: %v", err)
 	}
+	urlFilter := ""
+	if value, ok := query.ExtraParam["urlFilter"].(string); ok {
+		urlFilter = strings.TrimSpace(value)
+	}
 
 	tableName := fmt.Sprintf("%s_nginx_logs", query.WebsiteID)
+	urlJoin := ""
+	urlCondition := ""
+	args := []interface{}{startTime.Unix(), endTime.Unix()}
+	if urlFilter != "" {
+		urlJoin = fmt.Sprintf(`JOIN "%s_dim_url" u ON u.id = l.url_id`, query.WebsiteID)
+		urlCondition = " AND u.url LIKE ?"
+		args = append(args, "%"+urlFilter+"%")
+	}
 	rows, err := m.repo.GetDB().Query(
 		sqlutil.ReplacePlaceholders(fmt.Sprintf(`
-        SELECT timestamp, ip_id, ua_id
-        FROM "%s"
-        WHERE pageview_flag = 1 AND timestamp >= ? AND timestamp < ?
+        SELECT l.timestamp, l.ip_id, l.ua_id
+        FROM "%s" l
+        %s
+        WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ?%s
         ORDER BY ip_id, ua_id, timestamp`,
-			tableName)),
-		startTime.Unix(), endTime.Unix(),
+			tableName, urlJoin, urlCondition)),
+		args...,
 	)
 	if err != nil {
 		return result, fmt.Errorf("查询会话摘要失败: %v", err)

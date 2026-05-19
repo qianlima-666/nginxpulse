@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/likaia/nginxpulse/internal/sqlutil"
@@ -41,6 +42,10 @@ func NewTimeSeriesStatsManager(userRepoPtr *store.Repository) *TimeSeriesStatsMa
 func (s *TimeSeriesStatsManager) Query(query StatsQuery) (StatsResult, error) {
 	timeRange := query.ExtraParam["timeRange"].(string)
 	viewType := query.ExtraParam["viewType"].(string)
+	urlFilter := ""
+	if value, ok := query.ExtraParam["urlFilter"].(string); ok {
+		urlFilter = strings.TrimSpace(value)
+	}
 	timePoints, labels := timeutil.TimePointsAndLabels(timeRange, viewType)
 	result := TimeSeriesStats{
 		Labels:    labels,
@@ -49,7 +54,7 @@ func (s *TimeSeriesStatsManager) Query(query StatsQuery) (StatsResult, error) {
 		PvMinusUv: make([]int, len(timePoints)),
 	}
 
-	statPoints, err := s.statsByTimePointsForWebsite(query.WebsiteID, timePoints, viewType)
+	statPoints, err := s.statsByTimePointsForWebsite(query.WebsiteID, timePoints, viewType, urlFilter)
 	if err != nil {
 		return result, fmt.Errorf("获取图表数据失败: %v", err)
 	}
@@ -64,7 +69,7 @@ func (s *TimeSeriesStatsManager) Query(query StatsQuery) (StatsResult, error) {
 
 // statsByTimePointsForWebsite 根据多个时间点批量查询统计数据
 func (s *TimeSeriesStatsManager) statsByTimePointsForWebsite(
-	websiteID string, timePoints []time.Time, viewType string) ([]StatPoint, error) {
+	websiteID string, timePoints []time.Time, viewType string, urlFilter string) ([]StatPoint, error) {
 
 	timePointsSize := len(timePoints)
 	results := make([]StatPoint, timePointsSize)
@@ -73,11 +78,87 @@ func (s *TimeSeriesStatsManager) statsByTimePointsForWebsite(
 		return results, nil
 	}
 
+	if urlFilter != "" {
+		return s.statsByLogBuckets(websiteID, timePoints, viewType, results, urlFilter)
+	}
+
 	if viewType == "hourly" {
 		return s.statsByHourlyBuckets(websiteID, timePoints, results)
 	}
 
 	return s.statsByDailyBuckets(websiteID, timePoints, results)
+}
+
+func (s *TimeSeriesStatsManager) statsByLogBuckets(
+	websiteID string,
+	timePoints []time.Time,
+	viewType string,
+	results []StatPoint,
+	urlFilter string,
+) ([]StatPoint, error) {
+	bucketIndex := make(map[interface{}]int, len(timePoints))
+	for i, point := range timePoints {
+		if viewType == "hourly" {
+			bucketIndex[hourBucket(point)] = i
+		} else {
+			bucketIndex[dayBucket(point)] = i
+		}
+	}
+
+	startTime := timePoints[0]
+	endTime := timePoints[len(timePoints)-1]
+	if viewType == "hourly" {
+		endTime = endTime.Add(time.Hour)
+	} else {
+		endTime = endTime.AddDate(0, 0, 1)
+	}
+
+	query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
+        SELECT l.timestamp, l.ip_id
+        FROM "%[1]s_nginx_logs" l
+        JOIN "%[1]s_dim_url" u ON u.id = l.url_id
+        WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ? AND u.url LIKE ?`,
+		websiteID))
+
+	rows, err := s.repo.GetDB().Query(query, startTime.Unix(), endTime.Unix(), "%"+urlFilter+"%")
+	if err != nil {
+		return results, err
+	}
+	defer rows.Close()
+
+	uvSets := make([]map[int64]struct{}, len(results))
+	for rows.Next() {
+		var timestamp int64
+		var ipID int64
+		if err := rows.Scan(&timestamp, &ipID); err != nil {
+			return results, err
+		}
+
+		pointTime := time.Unix(timestamp, 0)
+		var key interface{}
+		if viewType == "hourly" {
+			key = hourBucket(pointTime)
+		} else {
+			key = dayBucket(pointTime)
+		}
+		idx, ok := bucketIndex[key]
+		if !ok {
+			continue
+		}
+		results[idx].PV++
+		if uvSets[idx] == nil {
+			uvSets[idx] = make(map[int64]struct{})
+		}
+		uvSets[idx][ipID] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return results, err
+	}
+	for idx, ips := range uvSets {
+		results[idx].UV = len(ips)
+	}
+
+	return results, nil
 }
 
 func (s *TimeSeriesStatsManager) statsByHourlyBuckets(

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/likaia/nginxpulse/internal/sqlutil"
@@ -99,6 +100,10 @@ func (s *OverallStatsManager) Query(query StatsQuery) (StatsResult, error) {
 	if err != nil {
 		return result, err
 	}
+	urlFilter := ""
+	if value, ok := query.ExtraParam["urlFilter"].(string); ok {
+		urlFilter = strings.TrimSpace(value)
+	}
 	prevStart, prevEnd := previousTimeRange(timeRange)
 	entryLimit := 10
 	if rawLimit, ok := query.ExtraParam["entryLimit"]; ok {
@@ -107,12 +112,12 @@ func (s *OverallStatsManager) Query(query StatsQuery) (StatsResult, error) {
 		}
 	}
 
-	err = s.statsByTimeRangeForWebsite(query.WebsiteID, startTime, endTime, &result)
+	err = s.statsByTimeRangeForWebsite(query.WebsiteID, startTime, endTime, &result, urlFilter)
 	if err != nil {
 		return result, fmt.Errorf("获取总体统计失败: %v", err)
 	}
 
-	statusHits, err := s.statusCodeHitsByTimeRangeForWebsite(query.WebsiteID, startTime, endTime)
+	statusHits, err := s.statusCodeHitsByTimeRangeForWebsite(query.WebsiteID, startTime, endTime, urlFilter)
 	if err != nil {
 		logrus.WithError(err).Warn("获取状态码统计失败")
 	} else {
@@ -120,7 +125,7 @@ func (s *OverallStatsManager) Query(query StatsQuery) (StatsResult, error) {
 	}
 
 	if !prevStart.IsZero() && !prevEnd.IsZero() {
-		prevStatusHits, err := s.statusCodeHitsByTimeRangeForWebsite(query.WebsiteID, prevStart, prevEnd)
+		prevStatusHits, err := s.statusCodeHitsByTimeRangeForWebsite(query.WebsiteID, prevStart, prevEnd, urlFilter)
 		if err != nil {
 			logrus.WithError(err).Warn("获取上一期状态码统计失败")
 		} else {
@@ -128,7 +133,7 @@ func (s *OverallStatsManager) Query(query StatsQuery) (StatsResult, error) {
 		}
 	}
 
-	metrics, err := collectSessionMetrics(s.repo, query.WebsiteID, startTime, endTime)
+	metrics, err := collectSessionMetrics(s.repo, query.WebsiteID, startTime, endTime, urlFilter)
 	if err != nil {
 		logrus.WithError(err).Warn("获取会话统计失败")
 	} else {
@@ -136,14 +141,14 @@ func (s *OverallStatsManager) Query(query StatsQuery) (StatsResult, error) {
 		result.EntryPages = buildEntryStats(metrics.EntryCounts, entryLimit)
 	}
 
-	activeCount, err := s.activeVisitorCount(query.WebsiteID)
+	activeCount, err := s.activeVisitorCount(query.WebsiteID, urlFilter)
 	if err != nil {
 		logrus.WithError(err).Warn("获取活跃访客失败")
 	} else {
 		result.ActiveVisitorCount = activeCount
 	}
 
-	newCount, returningCount, err := s.newReturningCounts(query.WebsiteID, startTime, endTime)
+	newCount, returningCount, err := s.newReturningCounts(query.WebsiteID, startTime, endTime, urlFilter)
 	if err != nil {
 		logrus.WithError(err).Warn("获取新老访客失败")
 	} else {
@@ -152,7 +157,7 @@ func (s *OverallStatsManager) Query(query StatsQuery) (StatsResult, error) {
 	}
 
 	if !prevStart.IsZero() && !prevEnd.IsZero() {
-		prevNew, prevReturning, err := s.newReturningCounts(query.WebsiteID, prevStart, prevEnd)
+		prevNew, prevReturning, err := s.newReturningCounts(query.WebsiteID, prevStart, prevEnd, urlFilter)
 		if err != nil {
 			logrus.WithError(err).Warn("获取上期新老访客失败")
 		} else {
@@ -163,7 +168,7 @@ func (s *OverallStatsManager) Query(query StatsQuery) (StatsResult, error) {
 
 	currentSnapshot := snapshotFromOverall(result)
 	prevSnapshot, prevSameSnapshot, forecastSnapshot := s.buildCompareSnapshots(
-		query.WebsiteID, timeRange, startTime, endTime, currentSnapshot,
+		query.WebsiteID, timeRange, startTime, endTime, currentSnapshot, urlFilter,
 	)
 	result.Compare = OverallCompare{
 		Previous: prevSnapshot,
@@ -176,12 +181,36 @@ func (s *OverallStatsManager) Query(query StatsQuery) (StatsResult, error) {
 
 // StatsByTimePoints 直接使用 db.Query() 方法查询数据库获取指定时间点的统计数据
 func (s *OverallStatsManager) statsByTimeRangeForWebsite(
-	websiteID string, startTime, endTime time.Time, overall *OverallStats) error {
+	websiteID string, startTime, endTime time.Time, overall *OverallStats, urlFilter string) error {
 
 	// 初始化结果
 	overall.PV = 0
 	overall.UV = 0
 	overall.Traffic = 0
+
+	if urlFilter != "" {
+		query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
+        SELECT
+            COALESCE(SUM(CASE WHEN l.pageview_flag = 1 THEN 1 ELSE 0 END), 0) AS pv,
+            COUNT(DISTINCT CASE WHEN l.pageview_flag = 1 THEN l.ip_id END) AS uv,
+            COALESCE(SUM(CASE WHEN l.pageview_flag = 1 THEN l.bytes_sent ELSE 0 END), 0) AS traffic
+        FROM "%[1]s_nginx_logs" l
+        JOIN "%[1]s_dim_url" u ON u.id = l.url_id
+        WHERE l.timestamp >= ? AND l.timestamp < ? AND u.url LIKE ?`,
+			websiteID))
+
+		var pv int64
+		var uv int64
+		var traffic int64
+		row := s.repo.GetDB().QueryRow(query, startTime.Unix(), endTime.Unix(), "%"+urlFilter+"%")
+		if err := row.Scan(&pv, &uv, &traffic); err != nil {
+			return fmt.Errorf("查询URL过滤总体统计失败: %v", err)
+		}
+		overall.PV = int(pv)
+		overall.UV = int(uv)
+		overall.Traffic = traffic
+		return nil
+	}
 
 	startDay := dayBucket(startTime)
 	endDay := dayBucket(endTime)
@@ -220,9 +249,28 @@ func (s *OverallStatsManager) statsByTimeRangeForWebsite(
 }
 
 func (s *OverallStatsManager) statusCodeHitsByTimeRangeForWebsite(
-	websiteID string, startTime, endTime time.Time) (StatusCodeHits, error) {
+	websiteID string, startTime, endTime time.Time, urlFilter string) (StatusCodeHits, error) {
 
 	result := StatusCodeHits{}
+	if urlFilter != "" {
+		query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
+        SELECT
+            COALESCE(SUM(CASE WHEN l.status_code >= 200 AND l.status_code < 300 THEN 1 ELSE 0 END), 0) AS s2xx,
+            COALESCE(SUM(CASE WHEN l.status_code >= 300 AND l.status_code < 400 THEN 1 ELSE 0 END), 0) AS s3xx,
+            COALESCE(SUM(CASE WHEN l.status_code >= 400 AND l.status_code < 500 THEN 1 ELSE 0 END), 0) AS s4xx,
+            COALESCE(SUM(CASE WHEN l.status_code >= 500 AND l.status_code < 600 THEN 1 ELSE 0 END), 0) AS s5xx,
+            COALESCE(SUM(CASE WHEN l.status_code < 200 OR l.status_code >= 600 THEN 1 ELSE 0 END), 0) AS other
+        FROM "%[1]s_nginx_logs" l
+        JOIN "%[1]s_dim_url" u ON u.id = l.url_id
+        WHERE l.timestamp >= ? AND l.timestamp < ? AND u.url LIKE ?`,
+			websiteID))
+
+		row := s.repo.GetDB().QueryRow(query, startTime.Unix(), endTime.Unix(), "%"+urlFilter+"%")
+		if err := row.Scan(&result.S2xx, &result.S3xx, &result.S4xx, &result.S5xx, &result.Other); err != nil {
+			return result, fmt.Errorf("查询URL过滤状态码统计失败: %v", err)
+		}
+		return result, nil
+	}
 	startDay := dayBucket(startTime)
 	endDay := dayBucket(endTime)
 
@@ -256,7 +304,11 @@ func collectSessionMetrics(
 	repo *store.Repository,
 	websiteID string,
 	startTime, endTime time.Time,
+	urlFilter string,
 ) (sessionMetrics, error) {
+	if urlFilter != "" {
+		return collectSessionMetricsFromLogs(repo, websiteID, startTime, endTime, urlFilter)
+	}
 	sessionAggTable := fmt.Sprintf("%s_agg_session_daily", websiteID)
 	entryAggTable := fmt.Sprintf("%s_agg_entry_daily", websiteID)
 	hasSessionAgg, err := tableExists(repo.GetDB(), sessionAggTable)
@@ -277,7 +329,7 @@ func collectSessionMetrics(
 		return sessionMetrics{EntryCounts: make(map[string]int)}, err
 	}
 	if !exists {
-		return collectSessionMetricsFromLogs(repo, websiteID, startTime, endTime)
+		return collectSessionMetricsFromLogs(repo, websiteID, startTime, endTime, "")
 	}
 	return collectSessionMetricsFromSessions(repo.GetDB(), websiteID, startTime, endTime)
 }
@@ -402,20 +454,27 @@ func collectSessionMetricsFromLogs(
 	repo *store.Repository,
 	websiteID string,
 	startTime, endTime time.Time,
+	urlFilter string,
 ) (sessionMetrics, error) {
 	metrics := sessionMetrics{
 		EntryCounts: make(map[string]int),
+	}
+	urlCondition := ""
+	args := []interface{}{startTime.Unix(), endTime.Unix()}
+	if urlFilter != "" {
+		urlCondition = " AND u.url LIKE ?"
+		args = append(args, "%"+urlFilter+"%")
 	}
 
 	query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
         SELECT l.timestamp, l.ip_id, l.ua_id, u.url
         FROM "%s_nginx_logs" l
         JOIN "%s_dim_url" u ON u.id = l.url_id
-        WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ?
+        WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ?%s
         ORDER BY l.ip_id, l.ua_id, l.timestamp`,
-		websiteID, websiteID))
+		websiteID, websiteID, urlCondition))
 
-	rows, err := repo.GetDB().Query(query, startTime.Unix(), endTime.Unix())
+	rows, err := repo.GetDB().Query(query, args...)
 	if err != nil {
 		return metrics, err
 	}
@@ -524,17 +583,26 @@ func buildEntryStats(counts map[string]int, limit int) ClientStats {
 	return result
 }
 
-func (s *OverallStatsManager) activeVisitorCount(websiteID string) (int, error) {
+func (s *OverallStatsManager) activeVisitorCount(websiteID string, urlFilter string) (int, error) {
 	now := time.Now()
 	start := now.Add(-15 * time.Minute)
+	urlJoin := ""
+	urlCondition := ""
+	args := []interface{}{start.Unix(), now.Unix()}
+	if urlFilter != "" {
+		urlJoin = fmt.Sprintf(`JOIN "%s_dim_url" u ON u.id = l.url_id`, websiteID)
+		urlCondition = " AND u.url LIKE ?"
+		args = append(args, "%"+urlFilter+"%")
+	}
 
 	query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
         SELECT COUNT(DISTINCT ip_id)
-        FROM "%s_nginx_logs"
-        WHERE pageview_flag = 1 AND timestamp >= ? AND timestamp < ?`,
-		websiteID))
+        FROM "%s_nginx_logs" l
+        %s
+        WHERE pageview_flag = 1 AND timestamp >= ? AND timestamp < ?%s`,
+		websiteID, urlJoin, urlCondition))
 
-	row := s.repo.GetDB().QueryRow(query, start.Unix(), now.Unix())
+	row := s.repo.GetDB().QueryRow(query, args...)
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return 0, err
@@ -544,7 +612,37 @@ func (s *OverallStatsManager) activeVisitorCount(websiteID string) (int, error) 
 
 func (s *OverallStatsManager) newReturningCounts(
 	websiteID string, startTime, endTime time.Time,
+	urlFilter string,
 ) (int, int, error) {
+	if urlFilter != "" {
+		query := sqlutil.ReplacePlaceholders(fmt.Sprintf(`
+        WITH active_ips AS (
+            SELECT DISTINCT l.ip_id
+            FROM "%[1]s_nginx_logs" l
+            JOIN "%[1]s_dim_url" u ON u.id = l.url_id
+            WHERE l.pageview_flag = 1 AND l.timestamp >= ? AND l.timestamp < ? AND u.url LIKE ?
+        )
+        SELECT
+            COALESCE(SUM(CASE WHEN fs.first_ts >= ? AND fs.first_ts < ? THEN 1 ELSE 0 END), 0) AS new_uv,
+            COALESCE(SUM(CASE WHEN fs.first_ts < ? THEN 1 ELSE 0 END), 0) AS returning_uv
+        FROM active_ips a
+        LEFT JOIN "%[1]s_first_seen" fs ON fs.ip_id = a.ip_id`,
+			websiteID))
+
+		row := s.repo.GetDB().QueryRow(
+			query,
+			startTime.Unix(), endTime.Unix(), "%"+urlFilter+"%",
+			startTime.Unix(), endTime.Unix(),
+			startTime.Unix(),
+		)
+
+		var newCount, returningCount int
+		if err := row.Scan(&newCount, &returningCount); err != nil {
+			return 0, 0, err
+		}
+		return newCount, returningCount, nil
+	}
+
 	startDay := dayBucket(startTime)
 	endDay := dayBucket(endTime)
 
@@ -634,13 +732,14 @@ func (s *OverallStatsManager) buildCompareSnapshots(
 	timeRange string,
 	startTime, endTime time.Time,
 	current OverallSnapshot,
+	urlFilter string,
 ) (OverallSnapshot, OverallSnapshot, OverallSnapshot) {
 	prevStart, prevEnd := previousTimeRange(timeRange)
 	if prevStart.IsZero() || prevEnd.IsZero() {
 		return OverallSnapshot{}, current, current
 	}
 
-	prevSnapshot, err := s.snapshotForRange(websiteID, prevStart, prevEnd)
+	prevSnapshot, err := s.snapshotForRange(websiteID, prevStart, prevEnd, urlFilter)
 	if err != nil {
 		logrus.WithError(err).Warn("获取上一期统计失败")
 	}
@@ -667,7 +766,7 @@ func (s *OverallStatsManager) buildCompareSnapshots(
 	}
 
 	progressForecast := scaleSnapshot(current, progress)
-	forecast := s.forecastSnapshot(websiteID, startTime, endTime, currentEnd, progressForecast)
+	forecast := s.forecastSnapshot(websiteID, startTime, endTime, currentEnd, progressForecast, urlFilter)
 
 	prevSameEnd := prevStart.Add(elapsed)
 	if prevSameEnd.After(prevEnd) {
@@ -675,7 +774,7 @@ func (s *OverallStatsManager) buildCompareSnapshots(
 	}
 	prevSameSnapshot := prevSnapshot
 	if prevSameEnd.After(prevStart) {
-		prevSameSnapshot, err = s.snapshotForRange(websiteID, prevStart, prevSameEnd)
+		prevSameSnapshot, err = s.snapshotForRange(websiteID, prevStart, prevSameEnd, urlFilter)
 		if err != nil {
 			logrus.WithError(err).Warn("获取上一期同期失败")
 			prevSameSnapshot = prevSnapshot
@@ -703,13 +802,14 @@ func scaleSnapshot(current OverallSnapshot, progress float64) OverallSnapshot {
 
 func (s *OverallStatsManager) snapshotForRange(
 	websiteID string, startTime, endTime time.Time,
+	urlFilter string,
 ) (OverallSnapshot, error) {
 	overall := OverallStats{}
-	if err := s.statsByTimeRangeForWebsite(websiteID, startTime, endTime, &overall); err != nil {
+	if err := s.statsByTimeRangeForWebsite(websiteID, startTime, endTime, &overall, urlFilter); err != nil {
 		return OverallSnapshot{}, err
 	}
 
-	metrics, err := collectSessionMetrics(s.repo, websiteID, startTime, endTime)
+	metrics, err := collectSessionMetrics(s.repo, websiteID, startTime, endTime, urlFilter)
 	if err != nil {
 		return OverallSnapshot{}, err
 	}
@@ -727,6 +827,7 @@ func (s *OverallStatsManager) forecastSnapshot(
 	websiteID string,
 	startTime, endTime, currentEnd time.Time,
 	progressForecast OverallSnapshot,
+	urlFilter string,
 ) OverallSnapshot {
 	if currentEnd.Before(startTime) {
 		return progressForecast
@@ -757,7 +858,7 @@ func (s *OverallStatsManager) forecastSnapshot(
 		windowStart = startTime
 	}
 
-	windowSnapshot, err := s.snapshotForRange(websiteID, windowStart, currentEnd)
+	windowSnapshot, err := s.snapshotForRange(websiteID, windowStart, currentEnd, urlFilter)
 	if err != nil {
 		logrus.WithError(err).Warn("获取预测窗口数据失败")
 		return progressForecast
