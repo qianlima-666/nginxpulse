@@ -12,6 +12,9 @@
       :placeholder="placeholderText"
       :loading="loading"
       :emptyMessage="emptyText"
+      :filter="true"
+      filterBy="name"
+      :filterPlaceholder="filterPlaceholderText"
     />
   </div>
 </template>
@@ -47,6 +50,7 @@ const disabled = computed(() => props.loading || props.websites.length === 0);
 const labelText = computed(() => props.label ?? t('common.website'));
 const loadingText = computed(() => props.loadingText ?? t('common.loading'));
 const emptyText = computed(() => props.emptyText ?? t('common.emptyWebsite'));
+const filterPlaceholderText = computed(() => t('common.searchWebsite'));
 const selectedValue = computed({
   get: () => props.modelValue,
   set: (value: string) => emit('update:modelValue', value),

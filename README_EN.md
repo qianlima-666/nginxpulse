@@ -8,7 +8,7 @@
 
 # NginxPulse
 
-Lightweight Nginx access log analytics and visualization dashboard with realtime stats, PV filtering, IP geo lookup, and client parsing.
+Lightweight Nginx access log analytics and visualization dashboard with realtime stats, PV filtering, IP geo lookup, client parsing, and searchable desktop website selection.
 
 Source repository: https://github.com/qianlima-666/nginxpulse
 

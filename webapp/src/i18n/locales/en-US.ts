@@ -43,6 +43,7 @@ const enUS = {
     action: 'Action',
     website: 'Website',
     selectWebsite: 'Select website',
+    searchWebsite: 'Search websites',
     emptyWebsite: 'No websites',
     all: 'All',
     today: 'Today',

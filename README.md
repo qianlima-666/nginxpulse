@@ -8,7 +8,7 @@
 
 # NginxPulse
 
-轻量级 Nginx 访问日志分析与可视化面板，提供实时统计、PV 过滤、IP 归属地与客户端解析。
+轻量级 Nginx 访问日志分析与可视化面板，提供实时统计、PV 过滤、IP 归属地与客户端解析；桌面端站点选择支持搜索。
 
 源码仓库：https://github.com/qianlima-666/nginxpulse
 

@@ -43,6 +43,7 @@ const zhCN = {
     action: '操作',
     website: '站点',
     selectWebsite: '选择站点',
+    searchWebsite: '搜索站点',
     emptyWebsite: '暂无站点',
     all: '全部',
     today: '今天',
