@@ -166,6 +166,26 @@ When logs are not on the NginxPulse host/container, use `websites[].sources`:
 }
 ```
 
+`autoDiscoverHosts` also works with polling `sources` such as `local`, `sftp`, `http`, and `s3`. The same requirement still applies: the log format must expose a parsable `host` field, and `mode` must not be `stream`. For example:
+```json
+{
+  "name": "SFTP Host Auto Discover",
+  "sources": [
+    {
+      "id": "sftp-main",
+      "type": "sftp",
+      "host": "10.0.0.10",
+      "port": 22,
+      "user": "nginx",
+      "auth": { "keyFile": "/home/nginxpulse/.ssh/id_ed25519" },
+      "path": "/var/log/nginx/access.log"
+    }
+  ],
+  "logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $host",
+  "autoDiscoverHosts": true
+}
+```
+
 More `local`, `sftp`, `http`, `s3`, and `agent` examples are in [Log Sources](Log-Sources-EN).
 
 ### Custom Log Format

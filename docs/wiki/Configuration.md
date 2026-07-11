@@ -166,6 +166,26 @@ nginx-proxy-manager 可直接使用内置日志类型：
 }
 ```
 
+`autoDiscoverHosts` 也支持轮询型 `sources`（如 `local`、`sftp`、`http`、`s3`）。前提仍然是日志格式里能解析出 `host` 字段，且 `mode` 不能是 `stream`。例如：
+```json
+{
+  "name": "SFTP Host Auto Discover",
+  "sources": [
+    {
+      "id": "sftp-main",
+      "type": "sftp",
+      "host": "10.0.0.10",
+      "port": 22,
+      "user": "nginx",
+      "auth": { "keyFile": "/home/nginxpulse/.ssh/id_ed25519" },
+      "path": "/var/log/nginx/access.log"
+    }
+  ],
+  "logFormat": "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" $host",
+  "autoDiscoverHosts": true
+}
+```
+
 更多 `local`、`sftp`、`http`、`s3`、`agent` 示例见[日志来源配置](Log-Sources)。
 
 ### 自定义日志格式

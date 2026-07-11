@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/url"
@@ -14,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/likaia/nginxpulse/internal/config"
+	"github.com/likaia/nginxpulse/internal/ingest/source"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,6 +25,8 @@ const maxHostDiscoveryTailBytes int64 = 512 * 1024
 const maxHostDiscoveryScannerBuffer = 1024 * 1024
 
 var domainLikePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$`)
+
+var newHostDiscoverySource = source.NewFromConfig
 
 func (p *LogParser) discoverAutoHostWebsites() {
 	if p.repo == nil {
@@ -70,7 +75,8 @@ func (p *LogParser) discoverHostsForTemplate(template config.WebsiteConfig) []st
 	if len(template.Sources) > 0 {
 		for i := range template.Sources {
 			sourceCfg := template.Sources[i]
-			if strings.ToLower(strings.TrimSpace(sourceCfg.Type)) != "local" {
+			mode := strings.ToLower(strings.TrimSpace(sourceCfg.Mode))
+			if mode == "stream" {
 				continue
 			}
 			parser, err := newLogLineParser(template, &sourceCfg)
@@ -78,7 +84,13 @@ func (p *LogParser) discoverHostsForTemplate(template config.WebsiteConfig) []st
 				logrus.WithError(err).Warnf("自动发现模板 %s 解析配置无效", template.Name)
 				continue
 			}
-			addHosts(parser, localSourceDiscoveryPaths(sourceCfg))
+			if strings.ToLower(strings.TrimSpace(sourceCfg.Type)) == "local" {
+				addHosts(parser, localSourceDiscoveryPaths(sourceCfg))
+				continue
+			}
+			for _, host := range p.discoverHostsInSource(template, sourceCfg, parser) {
+				hosts[host] = struct{}{}
+			}
 		}
 	} else {
 		parser, err := newLogLineParser(template, nil)
@@ -87,6 +99,33 @@ func (p *LogParser) discoverHostsForTemplate(template config.WebsiteConfig) []st
 			return nil
 		}
 		addHosts(parser, []string{template.LogPath})
+	}
+
+	result := make([]string, 0, len(hosts))
+	for host := range hosts {
+		result = append(result, host)
+	}
+	return result
+}
+
+func (p *LogParser) discoverHostsInSource(template config.WebsiteConfig, sourceCfg config.SourceConfig, parser *logLineParser) []string {
+	src, err := newHostDiscoverySource(template.Name, sourceCfg)
+	if err != nil {
+		logrus.WithError(err).Warnf("自动发现模板 %s 初始化 source %s 失败", template.Name, sourceCfg.ID)
+		return nil
+	}
+
+	targets, err := src.ListTargets(context.Background())
+	if err != nil {
+		logrus.WithError(err).Warnf("自动发现模板 %s 枚举 source %s 目标失败", template.Name, sourceCfg.ID)
+		return nil
+	}
+
+	hosts := make(map[string]struct{})
+	for _, target := range targets {
+		for _, host := range p.discoverHostsInTarget(context.Background(), src, target, parser) {
+			hosts[host] = struct{}{}
+		}
 	}
 
 	result := make([]string, 0, len(hosts))
@@ -207,6 +246,117 @@ func (p *LogParser) discoverHostsInRecentPlainFile(file *os.File, parser *logLin
 	}
 
 	return discoverHostsFromReader(bytes.NewReader(buf), parser, 0, file.Name()), nil
+}
+
+func (p *LogParser) discoverHostsInTarget(ctx context.Context, src source.LogSource, target source.TargetRef, parser *logLineParser) []string {
+	meta := target.Meta
+	if meta.Size == 0 && meta.ModTime.IsZero() && meta.ETag == "" {
+		updated, err := src.Stat(ctx, target)
+		if err != nil {
+			logrus.WithError(err).Warnf("自动发现无法获取远端目标信息: %s", target.Key)
+			return nil
+		}
+		meta = updated
+		target.Meta = updated
+	}
+
+	if meta.Compressed {
+		reader, err := openHostDiscoveryRange(ctx, src, target, 0, -1)
+		if err != nil {
+			logrus.WithError(err).Warnf("自动发现无法读取压缩远端日志: %s", target.Key)
+			return nil
+		}
+		if reader == nil {
+			return nil
+		}
+		defer reader.Close()
+
+		gzReader, err := gzip.NewReader(reader)
+		if err != nil {
+			logrus.WithError(err).Warnf("自动发现无法解析远端 gzip 日志文件: %s", target.Key)
+			return nil
+		}
+		defer gzReader.Close()
+
+		return discoverHostsFromReader(gzReader, parser, maxHostDiscoveryLinesPerFile, target.Key)
+	}
+
+	hosts, err := p.discoverHostsInRecentTarget(ctx, src, target, parser)
+	if err != nil {
+		logrus.WithError(err).Warnf("自动发现读取远端日志尾部失败: %s", target.Key)
+	} else if len(hosts) > 0 {
+		return hosts
+	}
+
+	reader, err := openHostDiscoveryRange(ctx, src, target, 0, maxHostDiscoveryTailBytes)
+	if err != nil {
+		logrus.WithError(err).Warnf("自动发现无法读取远端日志文件: %s", target.Key)
+		return nil
+	}
+	if reader == nil {
+		return nil
+	}
+	defer reader.Close()
+
+	return discoverHostsFromReader(reader, parser, maxHostDiscoveryLinesPerFile, target.Key)
+}
+
+func (p *LogParser) discoverHostsInRecentTarget(ctx context.Context, src source.LogSource, target source.TargetRef, parser *logLineParser) ([]string, error) {
+	size := target.Meta.Size
+	if size <= 0 {
+		return nil, nil
+	}
+
+	offset := size - maxHostDiscoveryTailBytes
+	if offset < 0 {
+		offset = 0
+	}
+
+	reader, err := openHostDiscoveryRange(ctx, src, target, offset, -1)
+	if err != nil {
+		return nil, err
+	}
+	if reader == nil {
+		return nil, nil
+	}
+	defer reader.Close()
+
+	buf, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	if offset > 0 {
+		newline := bytes.IndexByte(buf, '\n')
+		if newline < 0 {
+			return nil, nil
+		}
+		buf = buf[newline+1:]
+	}
+	if len(buf) == 0 {
+		return nil, nil
+	}
+
+	return discoverHostsFromReader(bytes.NewReader(buf), parser, 0, target.Key), nil
+}
+
+func openHostDiscoveryRange(ctx context.Context, src source.LogSource, target source.TargetRef, start, end int64) (io.ReadCloser, error) {
+	reader, err := src.OpenRange(ctx, target, start, end)
+	if err != nil {
+		if errors.Is(err, source.ErrRangeNotSupported) && start > 0 {
+			reader, err = src.OpenRange(ctx, target, 0, -1)
+			if err != nil {
+				return nil, err
+			}
+			if skipErr := skipReaderBytes(reader, start); skipErr != nil {
+				reader.Close()
+				return nil, skipErr
+			}
+			return reader, nil
+		}
+		return nil, err
+	}
+	return reader, nil
 }
 
 func discoverHostsFromReader(reader io.Reader, parser *logLineParser, maxLines int, filePath string) []string {
