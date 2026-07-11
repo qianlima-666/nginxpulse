@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/likaia/nginxpulse/internal/config"
-	"github.com/likaia/nginxpulse/internal/ingest/source"
+	"github.com/qianlima-666/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/ingest/source"
 )
 
 func TestExtractHostForDiscoveryFromNPMLine(t *testing.T) {

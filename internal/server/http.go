@@ -8,9 +8,9 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/likaia/nginxpulse/internal/analytics"
-	"github.com/likaia/nginxpulse/internal/ingest"
-	"github.com/likaia/nginxpulse/internal/web"
+	"github.com/qianlima-666/nginxpulse/internal/analytics"
+	"github.com/qianlima-666/nginxpulse/internal/ingest"
+	"github.com/qianlima-666/nginxpulse/internal/web"
 	"github.com/sirupsen/logrus"
 )
 

@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/brand-mark.svg" alt="NginxPulse Logo" width="120" height="120">
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/brand-mark.svg" alt="NginxPulse Logo" width="120" height="120">
 </p>
 
 <p align="center">
-  <a href="https://github.com/likaia/nginxpulse/blob/main/README_EN.md">English</a> | 简体中文
+  <a href="https://github.com/qianlima-666/nginxpulse/blob/main/README_EN.md">English</a> | 简体中文
 </p>
 
 # NginxPulse
 
 轻量级 Nginx 访问日志分析与可视化面板，提供实时统计、PV 过滤、IP 归属地与客户端解析。
 
-源码仓库：https://github.com/likaia/nginxpulse
+源码仓库：https://github.com/qianlima-666/nginxpulse
 
 ## 文档站点（推荐）
 
@@ -19,9 +19,9 @@
 
 > ⚠️注意：此文档只讲解了如何使用这个项目，详细文档与示例配置请移步[在线文档站点](https://nginx-pulse-docs.kaisir.cn/)
 
-![demo-img-1.png](https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/demo-img-1.png)
+![demo-img-1.png](https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/demo-img-1.png)
 
-![demo-img-2.png](https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/demo-img-2.png)
+![demo-img-2.png](https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/demo-img-2.png)
 ## 目录
 - [项目开发技术栈](#项目开发技术栈)
 - [IP 归属地查询策略](#ip-归属地查询策略)
@@ -345,15 +345,15 @@ nginxpulse: initializing postgres data dir at /app/var/pgdata
 非常感谢诸位好兄弟/姐妹对此项目的[投币](https://resource.kaisir.cn/uploads/MarkDownImg/20260128/pEZcuA.jpg)支持。
 
 <p align="left">
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-1.png" width="60" height="60" alt="supporter-1" />
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-2.png" width="60" height="60" alt="supporter-2" />
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-3.png" width="60" height="60" alt="supporter-3" />
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-4.png" width="60" height="60" alt="supporter-4" />
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-5.png" width="60" height="60" alt="supporter-5" />
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-6.png" width="60" height="60" alt="supporter-6" />
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-7.png" width="60" height="60" alt="supporter-7" />
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-8.png" width="60" height="60" alt="supporter-8" />
-  <img src="https://raw.githubusercontent.com/likaia/nginxpulse/main/docs/thanks/supporter-9.png" width="60" height="60" alt="supporter-9" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-1.png" width="60" height="60" alt="supporter-1" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-2.png" width="60" height="60" alt="supporter-2" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-3.png" width="60" height="60" alt="supporter-3" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-4.png" width="60" height="60" alt="supporter-4" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-5.png" width="60" height="60" alt="supporter-5" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-6.png" width="60" height="60" alt="supporter-6" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-7.png" width="60" height="60" alt="supporter-7" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-8.png" width="60" height="60" alt="supporter-8" />
+  <img src="https://raw.githubusercontent.com/qianlima-666/nginxpulse/main/docs/thanks/supporter-9.png" width="60" height="60" alt="supporter-9" />
 </p>
 
 ## 写在最后

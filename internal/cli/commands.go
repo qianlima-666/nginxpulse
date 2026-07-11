@@ -9,8 +9,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/likaia/nginxpulse/internal/config"
-	"github.com/likaia/nginxpulse/internal/version"
+	"github.com/qianlima-666/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/version"
 )
 
 // HandleAppConfig 处理应用程序配置初始化和命令行参数

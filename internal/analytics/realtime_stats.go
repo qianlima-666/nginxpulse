@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/config"
-	"github.com/likaia/nginxpulse/internal/sqlutil"
-	"github.com/likaia/nginxpulse/internal/store"
+	"github.com/qianlima-666/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/sqlutil"
+	"github.com/qianlima-666/nginxpulse/internal/store"
 )
 
 type RealtimeItem struct {

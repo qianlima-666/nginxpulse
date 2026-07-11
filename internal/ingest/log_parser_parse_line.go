@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/enrich"
-	"github.com/likaia/nginxpulse/internal/store"
+	"github.com/qianlima-666/nginxpulse/internal/enrich"
+	"github.com/qianlima-666/nginxpulse/internal/store"
 )
 
 func hasAnyField(indexMap map[string]int, aliases []string) bool {

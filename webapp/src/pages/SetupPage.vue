@@ -39,7 +39,7 @@
         <a
           v-if="!isManageMode"
           class="setup-brand brand"
-          href="https://github.com/likaia/nginxpulse/"
+          href="https://github.com/qianlima-666/nginxpulse/"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Open NginxPulse GitHub repository"

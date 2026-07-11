@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/config"
-	"github.com/likaia/nginxpulse/internal/ingest"
-	"github.com/likaia/nginxpulse/internal/logging"
+	"github.com/qianlima-666/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/ingest"
+	"github.com/qianlima-666/nginxpulse/internal/logging"
 	"github.com/sirupsen/logrus"
 )
 

@@ -87,7 +87,7 @@ jobs:
           fi
           BUILD_TIME="$(date -u "+%Y-%m-%d %H:%M:%S")"
           GIT_COMMIT="$(git rev-parse --short=7 HEAD)"
-          LDFLAGS="-s -w -X 'github.com/likaia/nginxpulse/internal/version.Version=${VERSION}' -X 'github.com/likaia/nginxpulse/internal/version.BuildTime=${BUILD_TIME}' -X 'github.com/likaia/nginxpulse/internal/version.GitCommit=${GIT_COMMIT}'"
+          LDFLAGS="-s -w -X 'github.com/qianlima-666/nginxpulse/internal/version.Version=${VERSION}' -X 'github.com/qianlima-666/nginxpulse/internal/version.BuildTime=${BUILD_TIME}' -X 'github.com/qianlima-666/nginxpulse/internal/version.GitCommit=${GIT_COMMIT}'"
           go build -tags embed -ldflags="${LDFLAGS}" -o "dist/${bin_name}" ./cmd/nginxpulse/main.go
 
       - name: Build agent binary

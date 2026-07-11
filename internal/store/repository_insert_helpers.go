@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/sqlutil"
+	"github.com/qianlima-666/nginxpulse/internal/sqlutil"
 )
 
 func getOrCreateDimID(

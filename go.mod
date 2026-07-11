@@ -1,4 +1,4 @@
-module github.com/likaia/nginxpulse
+module github.com/qianlima-666/nginxpulse
 
 go 1.24.0
 

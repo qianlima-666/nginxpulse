@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/sqlutil"
+	"github.com/qianlima-666/nginxpulse/internal/sqlutil"
 )
 
 func (r *Repository) ClearLogsForWebsiteRange(websiteID string, start, end time.Time) error {

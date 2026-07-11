@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	githubOwner             = "likaia"
+	githubOwner             = "qianlima-666"
 	githubRepo              = "nginxpulse"
 	githubAPITimeout        = 2500 * time.Millisecond
 	githubUpdateCacheTTL    = 6 * time.Hour

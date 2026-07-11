@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/likaia/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/config"
 )
 
 func NewFromConfig(websiteID string, cfg config.SourceConfig) (LogSource, error) {

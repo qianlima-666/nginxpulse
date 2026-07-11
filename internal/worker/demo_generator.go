@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/config"
-	"github.com/likaia/nginxpulse/internal/enrich"
-	"github.com/likaia/nginxpulse/internal/store"
+	"github.com/qianlima-666/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/enrich"
+	"github.com/qianlima-666/nginxpulse/internal/store"
 	"github.com/sirupsen/logrus"
 )
 
 var (
 	demoMethods = []string{"GET", "POST", "PUT", "DELETE"}
-	demoPaths = []string{
+	demoPaths   = []string{
 		"/", "/index.html", "/login", "/logout", "/dashboard",
 		"/api/stats/overall", "/api/stats/logs", "/api/stats/location",
 		"/api/user/profile", "/api/user/login", "/api/user/logout",

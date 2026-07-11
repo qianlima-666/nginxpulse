@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
 BUILD_TIME ?= $(shell date "+%Y-%m-%d %H:%M:%S")
 GIT_COMMIT ?= $(shell git rev-parse --short=7 HEAD 2>/dev/null || echo unknown)
-LDFLAGS = -s -w -X 'github.com/likaia/nginxpulse/internal/version.Version=$(VERSION)' -X 'github.com/likaia/nginxpulse/internal/version.BuildTime=$(BUILD_TIME)' -X 'github.com/likaia/nginxpulse/internal/version.GitCommit=$(GIT_COMMIT)'
+LDFLAGS = -s -w -X 'github.com/qianlima-666/nginxpulse/internal/version.Version=$(VERSION)' -X 'github.com/qianlima-666/nginxpulse/internal/version.BuildTime=$(BUILD_TIME)' -X 'github.com/qianlima-666/nginxpulse/internal/version.GitCommit=$(GIT_COMMIT)'
 
 frontend:
 	cd webapp && pnpm install --frozen-lockfile && pnpm run build

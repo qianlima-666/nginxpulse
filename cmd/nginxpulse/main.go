@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/likaia/nginxpulse/internal/app"
+	"github.com/qianlima-666/nginxpulse/internal/app"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,5 +45,3 @@ func tryTerminatePID1IfNginx() {
 	}
 	logrus.Warn("服务启动失败：检测到 PID 1 为 nginx，已发送 SIGTERM 以终止容器")
 }
-
-

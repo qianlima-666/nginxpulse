@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/likaia/nginxpulse/internal/sqlutil"
-	"github.com/likaia/nginxpulse/internal/store"
-	"github.com/likaia/nginxpulse/internal/timeutil"
+	"github.com/qianlima-666/nginxpulse/internal/sqlutil"
+	"github.com/qianlima-666/nginxpulse/internal/store"
+	"github.com/qianlima-666/nginxpulse/internal/timeutil"
 )
 
 type SessionSummary struct {

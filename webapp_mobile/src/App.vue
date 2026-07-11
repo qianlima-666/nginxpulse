@@ -21,7 +21,7 @@
       <template #left>
         <a
           class="mobile-brand"
-          href="https://github.com/likaia/nginxpulse/"
+          href="https://github.com/qianlima-666/nginxpulse/"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Open NginxPulse GitHub repository"
@@ -66,8 +66,8 @@
       @close="demoBannerVisible = false"
     >
       {{ t('demo.text') }}
-      <a href="https://github.com/likaia/nginxpulse/" target="_blank" rel="noopener">
-        https://github.com/likaia/nginxpulse/
+      <a href="https://github.com/qianlima-666/nginxpulse/" target="_blank" rel="noopener">
+        https://github.com/qianlima-666/nginxpulse/
       </a>
     </van-notice-bar>
 

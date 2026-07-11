@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/config"
 )
 
 func TestNginxIngressParserParsesTraceFields(t *testing.T) {

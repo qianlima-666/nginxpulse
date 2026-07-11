@@ -91,7 +91,7 @@ export default function HomePage() {
             </Link>
           </div>
           <Link
-            href="https://github.com/likaia/nginxpulse/?tab=MIT-1-ov-file"
+            href="https://github.com/qianlima-666/nginxpulse/?tab=MIT-1-ov-file"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-full border border-fd-border bg-fd-background/85 px-3 py-1 text-xs text-fd-muted-foreground hover:text-fd-foreground"
@@ -154,7 +154,7 @@ export default function HomePage() {
               <ArrowRight className="np-home-action-arrow np-home-action-arrow-intro size-4" />
             </Link>
             <Link
-              href="https://github.com/likaia/nginxpulse"
+              href="https://github.com/qianlima-666/nginxpulse"
               target="_blank"
               rel="noreferrer"
               className="np-home-card np-home-action-btn group inline-flex items-center rounded-lg border border-fd-border bg-fd-card px-4 py-2 text-sm font-medium text-fd-muted-foreground hover:text-fd-foreground"

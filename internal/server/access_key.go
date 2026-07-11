@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/likaia/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/config"
 )
 
 const accessKeyHeader = "X-NginxPulse-Key"

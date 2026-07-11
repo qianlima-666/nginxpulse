@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/likaia/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/config"
 )
 
 const serverStatusMaxBodyBytes = 2 * 1024 * 1024

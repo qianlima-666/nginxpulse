@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/config"
 	"github.com/lionsoul2014/ip2region/binding/golang/xdb"
+	"github.com/qianlima-666/nginxpulse/internal/config"
 	"github.com/sirupsen/logrus"
 )
 

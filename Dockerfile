@@ -56,7 +56,7 @@ ARG VERSION
 RUN CGO_ENABLED=0 \
     GOOS=${TARGETOS:-$(go env GOOS)} \
     GOARCH=${TARGETARCH:-$(go env GOARCH)} \
-    go build -ldflags="-s -w -X 'github.com/likaia/nginxpulse/internal/version.Version=${VERSION}' -X 'github.com/likaia/nginxpulse/internal/version.BuildTime=${BUILD_TIME}' -X 'github.com/likaia/nginxpulse/internal/version.GitCommit=${GIT_COMMIT}'" \
+    go build -ldflags="-s -w -X 'github.com/qianlima-666/nginxpulse/internal/version.Version=${VERSION}' -X 'github.com/qianlima-666/nginxpulse/internal/version.BuildTime=${BUILD_TIME}' -X 'github.com/qianlima-666/nginxpulse/internal/version.GitCommit=${GIT_COMMIT}'" \
     -o /out/nginxpulse ./cmd/nginxpulse/main.go
 
 FROM nginx:1.27-alpine AS runtime

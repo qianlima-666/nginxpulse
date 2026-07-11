@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/likaia/nginxpulse/internal/config"
-	"github.com/likaia/nginxpulse/internal/enrich"
-	"github.com/likaia/nginxpulse/internal/store"
+	"github.com/qianlima-666/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/enrich"
+	"github.com/qianlima-666/nginxpulse/internal/store"
 	"github.com/sirupsen/logrus"
 )
 

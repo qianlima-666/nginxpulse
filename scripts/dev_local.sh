@@ -6,7 +6,7 @@ DEV_CONFIG="$ROOT_DIR/configs/nginxpulse_config.dev.json"
 VERSION="${VERSION:-$(git -C "$ROOT_DIR" describe --tags --abbrev=0 2>/dev/null || echo "dev")}"
 BUILD_TIME="${BUILD_TIME:-$(date "+%Y-%m-%d %H:%M:%S")}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "$ROOT_DIR" rev-parse --short=7 HEAD 2>/dev/null || echo "unknown")}"
-LDFLAGS="-s -w -X 'github.com/likaia/nginxpulse/internal/version.Version=${VERSION}' -X 'github.com/likaia/nginxpulse/internal/version.BuildTime=${BUILD_TIME}' -X 'github.com/likaia/nginxpulse/internal/version.GitCommit=${GIT_COMMIT}'"
+LDFLAGS="-s -w -X 'github.com/qianlima-666/nginxpulse/internal/version.Version=${VERSION}' -X 'github.com/qianlima-666/nginxpulse/internal/version.BuildTime=${BUILD_TIME}' -X 'github.com/qianlima-666/nginxpulse/internal/version.GitCommit=${GIT_COMMIT}'"
 
 backend_pid=""
 backend_container=""

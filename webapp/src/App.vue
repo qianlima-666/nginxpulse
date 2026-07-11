@@ -5,7 +5,7 @@
       <aside v-if="!hideSidebar" class="sidebar">
         <a
           class="brand"
-          href="https://github.com/likaia/nginxpulse/"
+          href="https://github.com/qianlima-666/nginxpulse/"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Open NginxPulse GitHub repository"
@@ -104,7 +104,7 @@
           <span class="demo-mode-badge">{{ t('demo.badge') }}</span>
           <span class="demo-mode-text">
             {{ t('demo.text') }}
-            <a href="https://github.com/likaia/nginxpulse/" target="_blank" rel="noopener">https://github.com/likaia/nginxpulse/</a>
+            <a href="https://github.com/qianlima-666/nginxpulse/" target="_blank" rel="noopener">https://github.com/qianlima-666/nginxpulse/</a>
           </span>
         </div>
         <RouterView :key="`${route.fullPath}-${currentLocale}-${accessKeyReloadToken}`" />
@@ -303,7 +303,7 @@ async function refreshVersionInfo() {
   const previewVersion = resolvePreviewVersion();
   if (previewVersion) {
     latestVersion.value = previewVersion;
-    latestReleaseUrl.value = `https://github.com/likaia/nginxpulse/releases/tag/${previewVersion}`;
+    latestReleaseUrl.value = `https://github.com/qianlima-666/nginxpulse/releases/tag/${previewVersion}`;
     updateAvailable.value = true;
     return;
   }

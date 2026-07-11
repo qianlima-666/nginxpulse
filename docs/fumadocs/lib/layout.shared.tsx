@@ -7,7 +7,7 @@ type BaseOptionsInput = {
 
 // fill this with your actual GitHub info, for example:
 export const gitConfig = {
-  user: 'likaia',
+  user: 'qianlima-666',
   repo: 'nginxpulse',
   branch: 'main',
 };
@@ -46,7 +46,7 @@ export function baseOptions({ includeMainLinks = true }: BaseOptionsInput = {}):
           {
             type: 'main',
             text: '用户交流群',
-            url: 'https://github.com/likaia/nginxpulse/issues/9',
+            url: 'https://github.com/qianlima-666/nginxpulse/issues/9',
             external: true,
             active: 'none',
           },

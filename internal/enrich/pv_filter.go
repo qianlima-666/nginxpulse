@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/likaia/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/config"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/likaia/nginxpulse/internal/sqlutil"
+	"github.com/qianlima-666/nginxpulse/internal/sqlutil"
 	"github.com/sirupsen/logrus"
 )
 

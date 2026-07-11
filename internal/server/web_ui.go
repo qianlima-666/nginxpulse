@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/likaia/nginxpulse/internal/webui"
+	"github.com/qianlima-666/nginxpulse/internal/webui"
 	"github.com/sirupsen/logrus"
 )
 

@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/likaia/nginxpulse/internal/alertpush"
-	"github.com/likaia/nginxpulse/internal/analytics"
-	"github.com/likaia/nginxpulse/internal/config"
-	"github.com/likaia/nginxpulse/internal/ingest"
-	"github.com/likaia/nginxpulse/internal/store"
-	"github.com/likaia/nginxpulse/internal/version"
+	"github.com/qianlima-666/nginxpulse/internal/alertpush"
+	"github.com/qianlima-666/nginxpulse/internal/analytics"
+	"github.com/qianlima-666/nginxpulse/internal/config"
+	"github.com/qianlima-666/nginxpulse/internal/ingest"
+	"github.com/qianlima-666/nginxpulse/internal/store"
+	"github.com/qianlima-666/nginxpulse/internal/version"
 	"github.com/sirupsen/logrus"
 )
 
