@@ -154,8 +154,15 @@ const websiteOptions = computed(() =>
 );
 
 const websiteActions = computed(() =>
-  websites.value.map((site) => ({ name: site.name, value: site.id }))
+  websites.value.map((site) => ({ name: formatWebsiteActionName(site), value: site.id }))
 );
+
+function formatWebsiteActionName(site: WebsiteInfo) {
+  const source = site.sourceType === 'remote' ? '远程' : '本地';
+  const sourceId = site.remoteSourceId || site.sourceIds?.[0] || '';
+  const tags = [source, sourceId, site.autoDiscoverHosts ? site.customLabel || '自动识别' : ''].filter(Boolean);
+  return tags.length ? `${site.name} · ${tags.join(' · ')}` : site.name;
+}
 
 const windowOptions = computed(() => [
   { text: t('realtime.minutes', { value: 5 }), value: 5 },

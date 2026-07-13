@@ -45,6 +45,7 @@ func (p *LogParser) discoverAutoHostWebsites() {
 			site.Name = host
 			site.Domains = []string{host}
 			site.AutoDiscoverHosts = false
+			site.Tags = expandAutoDiscoverTags(template, host)
 
 			websiteID, registered := config.RegisterRuntimeWebsite(site)
 			if websiteID == "" {
@@ -144,6 +145,25 @@ func localSourceDiscoveryPaths(sourceCfg config.SourceConfig) []string {
 		paths = append(paths, sourceCfg.Pattern)
 	}
 	return paths
+}
+
+func expandAutoDiscoverTags(template config.WebsiteConfig, host string) []string {
+	host = strings.TrimSpace(host)
+	if len(template.Tags) == 0 {
+		return nil
+	}
+	tags := make([]string, 0, len(template.Tags))
+	for _, tag := range template.Tags {
+		expanded := strings.TrimSpace(strings.ReplaceAll(tag, "{host}", host))
+		if expanded == "" {
+			continue
+		}
+		tags = append(tags, expanded)
+	}
+	if len(tags) == 0 {
+		return nil
+	}
+	return tags
 }
 
 func (p *LogParser) discoverHostsInPath(path string, parser *logLineParser) []string {

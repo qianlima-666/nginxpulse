@@ -84,7 +84,7 @@ export const restartSystem = async (): Promise<{ success: boolean }> => {
 };
 
 export const testAlertPush = async (payload: {
-  alertPush?: Record<string, any>;
+  alertPush?: Record<string, unknown>;
   message?: string;
   channels?: string[];
 }): Promise<AlertPushTestResponse> => {

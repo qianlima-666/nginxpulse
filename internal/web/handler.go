@@ -23,6 +23,83 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type websiteSourceType string
+
+const (
+	websiteSourceTypeLocal  websiteSourceType = "local"
+	websiteSourceTypeRemote websiteSourceType = "remote"
+)
+
+type websiteInfo struct {
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	DisplayName       string   `json:"displayName"`
+	SourceType        string   `json:"sourceType"`
+	SourceIDs         []string `json:"sourceIds"`
+	SourceLabel       string   `json:"sourceLabel"`
+	RemoteSourceID    string   `json:"remoteSourceId"`
+	Tags              []string `json:"tags"`
+	AutoDiscoverHosts bool     `json:"autoDiscoverHosts"`
+	CustomLabel       string   `json:"customLabel"`
+}
+
+func buildWebsiteInfo(id string, website config.WebsiteConfig) websiteInfo {
+	displayName := strings.TrimSpace(website.CustomLabel)
+	if displayName == "" {
+		displayName = strings.TrimSpace(website.Name)
+	}
+
+	sourceType := websiteSourceTypeLocal
+	sourceIDs := make([]string, 0)
+	remoteSourceID := ""
+	for _, source := range website.Sources {
+		if !strings.EqualFold(strings.TrimSpace(source.Type), "local") {
+			sourceType = websiteSourceTypeRemote
+			if sourceID := strings.TrimSpace(source.ID); sourceID != "" {
+				sourceIDs = append(sourceIDs, sourceID)
+				if remoteSourceID == "" {
+					remoteSourceID = sourceID
+				}
+			}
+		}
+	}
+	if sourceType == websiteSourceTypeLocal {
+		sourceIDs = nil
+	}
+
+	tags := make([]string, 0, len(website.Tags)+1)
+	seen := make(map[string]struct{}, len(website.Tags)+1)
+	for _, tag := range website.Tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		tags = append(tags, tag)
+	}
+	if customLabel := strings.TrimSpace(website.CustomLabel); customLabel != "" {
+		if _, ok := seen[customLabel]; !ok {
+			tags = append(tags, customLabel)
+		}
+	}
+
+	return websiteInfo{
+		ID:                id,
+		Name:              website.Name,
+		DisplayName:       displayName,
+		SourceType:        string(sourceType),
+		SourceIDs:         sourceIDs,
+		SourceLabel:       string(sourceType),
+		RemoteSourceID:    remoteSourceID,
+		Tags:              tags,
+		AutoDiscoverHosts: website.AutoDiscoverHosts,
+		CustomLabel:       website.CustomLabel,
+	}
+}
+
 // 初始化Web路由
 func SetupRoutes(
 	router *gin.Engine,
@@ -33,17 +110,14 @@ func SetupRoutes(
 	router.GET("/api/websites", func(c *gin.Context) {
 		websiteIDs := config.GetAllWebsiteIDs()
 
-		websites := make([]map[string]string, 0, len(websiteIDs))
+		websites := make([]websiteInfo, 0, len(websiteIDs))
 		for _, id := range websiteIDs {
 			website, ok := config.GetWebsiteByID(id)
 			if !ok {
 				continue
 			}
 
-			websites = append(websites, map[string]string{
-				"id":   id,
-				"name": website.Name,
-			})
+			websites = append(websites, buildWebsiteInfo(id, website))
 		}
 
 		c.JSON(http.StatusOK, gin.H{

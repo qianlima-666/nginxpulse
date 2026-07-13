@@ -40,6 +40,8 @@ If the log file and PostgreSQL are reachable, start with this:
 - `websites[].domains`: domain list. Recommended for same-site referer detection.
 - `websites[].logType`: log type. Supported values and samples are in [Supported Log Formats](Supported-Log-Formats-EN).
 - `websites[].autoDiscoverHosts`: use this entry as a discovery template and generate real sites from parsed `host` values.
+- `websites[].customLabel`: custom site tag shown in the site selector when `autoDiscoverHosts` is enabled; falls back to the default label when empty.
+- `websites[].tags`: extra tag array returned together with the site info.
 - `database.dsn`: PostgreSQL connection string.
 - `server.Port`: Web/API listen port. `:8089` is the common default.
 

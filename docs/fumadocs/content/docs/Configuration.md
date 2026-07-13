@@ -40,6 +40,8 @@ title: "配置说明"
 - `websites[].domains`：站点域名列表，建议填写，用于判断站内来源。
 - `websites[].logType`：日志类型。可选值和示例见[支持的日志格式](Supported-Log-Formats)。
 - `websites[].autoDiscoverHosts`：开启后该项作为发现模板，按日志里的 `host` 字段自动生成真实站点。
+- `websites[].customLabel`：自定义站点标签，`autoDiscoverHosts` 开启时会在站点选择中显示；留空时使用默认提示。
+- `websites[].tags`：额外标签数组，会随站点信息一起返回。
 - `database.dsn`：PostgreSQL 连接地址。
 - `server.Port`：Web/API 监听端口，默认常用 `:8089`。
 

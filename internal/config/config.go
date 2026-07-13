@@ -43,6 +43,8 @@ type WebsiteConfig struct {
 	Sources           []SourceConfig   `json:"sources,omitempty"`
 	Whitelist         *WhitelistConfig `json:"whitelist,omitempty"`
 	AutoDiscoverHosts bool             `json:"autoDiscoverHosts,omitempty"`
+	CustomLabel       string           `json:"customLabel,omitempty"`
+	Tags              []string         `json:"tags,omitempty"`
 }
 
 type SourceConfig struct {

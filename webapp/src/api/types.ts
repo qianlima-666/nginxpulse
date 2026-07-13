@@ -1,6 +1,16 @@
+export type WebsiteSourceType = 'local' | 'remote';
+
 export interface WebsiteInfo {
   id: string;
   name: string;
+  sourceLabel?: string;
+  remoteSourceId?: string;
+  autoDiscoverHosts?: boolean;
+  displayName?: string;
+  sourceType?: WebsiteSourceType;
+  sourceIds?: string[];
+  tags?: string[];
+  customLabel?: string;
 }
 
 export interface WebsitesResponse {
@@ -38,7 +48,7 @@ export interface VersionInfoResponse {
 }
 
 export interface SourceConfig {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface WhitelistConfig {
@@ -59,6 +69,8 @@ export interface WebsiteConfig {
   sources?: SourceConfig[];
   whitelist?: WhitelistConfig;
   autoDiscoverHosts?: boolean;
+  customLabel?: string;
+  tags?: string[];
 }
 
 export interface SystemConfig {
@@ -70,7 +82,7 @@ export interface SystemConfig {
   logRetentionDays?: number;
   parseBatchSize?: number;
   ipGeoCacheLimit?: number;
-  alertPush?: Record<string, any>;
+  alertPush?: Record<string, unknown>;
   demoMode?: boolean;
   accessKeys?: string[];
   accessKeyExpireDays?: number;
@@ -365,7 +377,7 @@ export interface SystemNotification {
   created_at?: string;
   last_occurred_at?: string;
   read_at?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SystemNotificationListResponse {

@@ -203,6 +203,11 @@
                       <span class="setup-switch-dot"></span>
                     </button>
                   </div>
+                  <div class="setup-field">
+                    <label class="setup-label">{{ t('setup.fields.customLabel') }}</label>
+                    <input v-model.trim="site.customLabel" class="setup-input" type="text" :placeholder="t('setup.placeholders.customLabel')" />
+                    <div class="setup-hint">{{ t('setup.hints.customLabel') }}</div>
+                  </div>
                   <div class="setup-parse-group">
                     <div class="setup-parse-head">
                       <div class="setup-parse-title">{{ t('setup.logValidation.groupTitle') }}</div>
@@ -833,6 +838,7 @@ interface WebsiteDraft {
   logFormat: string;
   logRegex: string;
   autoDiscoverHosts: boolean;
+  customLabel: string;
   logValidationStatus: LogValidationStatus;
   logValidationMessage: string;
   timeLayout: string;
@@ -1014,6 +1020,7 @@ function createWebsiteDraft(prefillLogPath = ''): WebsiteDraft {
     logFormat: '',
     logRegex: '',
     autoDiscoverHosts: false,
+    customLabel: '',
     logValidationStatus: 'idle',
     logValidationMessage: '',
     timeLayout: '',
@@ -1567,6 +1574,7 @@ function buildConfig(collectErrors = true): { config: ConfigPayload; errors: Fie
       sources,
       whitelist,
       autoDiscoverHosts: site.autoDiscoverHosts,
+      customLabel: site.customLabel.trim() || undefined,
     };
   });
 
@@ -1899,6 +1907,7 @@ function hydrateDraft(config: ConfigPayload) {
     logFormat: site.logFormat || '',
     logRegex: site.logRegex || '',
     autoDiscoverHosts: Boolean(site.autoDiscoverHosts),
+    customLabel: site.customLabel || '',
     logValidationStatus: 'idle' as LogValidationStatus,
     logValidationMessage: '',
     timeLayout: site.timeLayout || '',
