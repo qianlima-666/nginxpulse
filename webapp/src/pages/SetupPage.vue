@@ -16,6 +16,26 @@
       </div>
     </div>
 
+    <div v-else-if="setupPasswordRequired" class="setup-loading">
+      <div class="setup-loading-card">
+        <div class="setup-loading-text">{{ t('setup.setupPasswordRequired') }}</div>
+        <form class="setup-field" @submit.prevent="submitSetupPassword">
+          <label class="setup-label">{{ t('setup.fields.setupPassword') }}</label>
+          <input
+            v-model="setupPasswordInput"
+            class="setup-input"
+            type="password"
+            autocomplete="current-password"
+            :placeholder="t('setup.placeholders.setupPassword')"
+          />
+          <div v-if="setupPasswordError" class="setup-error">{{ setupPasswordError }}</div>
+          <button class="setup-primary-btn" type="submit" :disabled="setupPasswordSubmitting">
+            {{ setupPasswordSubmitting ? t('common.loading') : t('common.confirm') }}
+          </button>
+        </form>
+      </div>
+    </div>
+
     <div v-else class="setup-surface">
       <div v-if="!isManageMode" class="setup-lang">
         <div class="sidebar-language-compact" role="group" :aria-label="t('app.sidebar.language')" :key="currentLocale">
@@ -441,9 +461,26 @@
               </div>
               <div class="setup-field-grid">
                 <div class="setup-field">
+                  <label class="setup-label">{{ t('setup.fields.setupPassword') }}</label>
+                  <input
+                    v-model.trim="systemDraft.setupPassword"
+                    class="setup-input"
+                    type="password"
+                    autocomplete="new-password"
+                    :placeholder="t('setup.placeholders.setupPassword')"
+                  />
+                  <div class="setup-hint">{{ t('setup.hints.setupPassword') }}</div>
+                  <label class="setup-checkline">
+                    <input v-model="systemDraft.setupPasswordClear" type="checkbox" />
+                    <span>{{ t('setup.fields.setupPasswordClear') }}</span>
+                  </label>
+                </div>
+                <div class="setup-field">
                   <label class="setup-label">{{ t('setup.fields.accessKeys') }}</label>
                   <input v-model.trim="systemDraft.accessKeysText" class="setup-input" type="text" :placeholder="t('setup.placeholders.accessKeys')" />
                 </div>
+              </div>
+              <div class="setup-field-grid">
                 <div class="setup-field">
                   <label class="setup-label">{{ t('setup.fields.accessKeyExpireDays') }}</label>
                   <input
@@ -923,6 +960,10 @@ const alertPushTestMessage = ref('');
 const alertPushTesting = ref(false);
 const alertPushTestResult = ref<AlertPushTestResponse | null>(null);
 const alertPushTestError = ref('');
+const setupPasswordRequired = ref(false);
+const setupPasswordInput = ref(localStorage.getItem(SETUP_PASSWORD_STORAGE) || '');
+const setupPasswordError = ref('');
+const setupPasswordSubmitting = ref(false);
 let copyStatusTimer: number | null = null;
 
 const serverPort = ref(':8089');
@@ -951,6 +992,7 @@ const systemDraft = reactive({
   serverStatusDisksUrl: '',
   serverStatusTimeout: '5s',
   serverStatusRefreshInterval: '30s',
+  setupPassword: '',
   accessKeysText: '',
   accessKeyExpireDays: '7',
   language: 'zh-CN',
@@ -1619,6 +1661,8 @@ function buildConfig(collectErrors = true): { config: ConfigPayload; errors: Fie
       alertPush: parseOptionalJSONObject(systemDraft.alertPushJson, 'system.alertPush', errors),
       demoMode: systemDraft.demoMode,
       mobilePwaEnabled: systemDraft.mobilePwaEnabled,
+      setupPassword: systemDraft.setupPasswordClear ? '' : systemDraft.setupPassword.trim(),
+      setupPasswordClear: systemDraft.setupPasswordClear,
       accessKeys: splitList(systemDraft.accessKeysText),
       accessKeyExpireDays: parseOptionalInt(systemDraft.accessKeyExpireDays, 'system.accessKeyExpireDays', errors, false),
       language: systemDraft.language,
@@ -1742,6 +1786,13 @@ async function saveAll() {
     const result = await saveConfig(config);
     saveSuccess.value = Boolean(result.success);
     if (saveSuccess.value) {
+      setupPasswordRequired.value = false;
+      setupPasswordError.value = '';
+      if (config.system?.setupPasswordClear) {
+        setupPasswordInput.value = '';
+      } else if (config.system?.setupPassword?.trim()) {
+        setupPasswordInput.value = config.system.setupPassword.trim();
+      }
       try {
         await restartSystem();
       } catch (err) {
@@ -1854,11 +1905,37 @@ async function loadConfig() {
     const response = await fetchConfig();
     defaultLogPath.value = response.default_log_path || '';
     configReadonly.value = Boolean(response.readonly);
+    setupPasswordRequired.value = false;
+    setupPasswordError.value = '';
     hydrateDraft(response.config);
   } catch (err) {
-    loadError.value = err instanceof Error ? err.message : t('common.requestFailed');
+    const message = err instanceof Error ? err.message : t('common.requestFailed');
+    const normalized = message.toLowerCase();
+    if (normalized.includes('系统配置密码') || normalized.includes('settings password')) {
+      setupPasswordRequired.value = true;
+      setupPasswordError.value = message;
+      loadError.value = '';
+    } else {
+      loadError.value = message;
+    }
   } finally {
     loading.value = false;
+  }
+}
+
+async function submitSetupPassword() {
+  const value = setupPasswordInput.value.trim();
+  if (!value) {
+    setupPasswordError.value = t('setup.errors.required');
+    return;
+  }
+  setupPasswordSubmitting.value = true;
+  setupPasswordError.value = '';
+  saveSetupPassword(value);
+  try {
+    await loadConfig();
+  } finally {
+    setupPasswordSubmitting.value = false;
   }
 }
 
@@ -1887,6 +1964,7 @@ function hydrateDraft(config: ConfigPayload) {
   systemDraft.serverStatusDisksUrl = config.system?.serverStatus?.disksUrl || '';
   systemDraft.serverStatusTimeout = config.system?.serverStatus?.timeout || '5s';
   systemDraft.serverStatusRefreshInterval = config.system?.serverStatus?.refreshInterval || '30s';
+  systemDraft.setupPassword = '';
   systemDraft.accessKeysText = (config.system?.accessKeys || []).join(', ');
   systemDraft.accessKeyExpireDays = String(config.system?.accessKeyExpireDays ?? 7);
   systemDraft.language = config.system?.language || 'zh-CN';

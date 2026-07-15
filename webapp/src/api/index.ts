@@ -75,6 +75,11 @@ export const saveConfig = async (config: ConfigPayload): Promise<ConfigSaveRespo
   const response = await client.post<ApiResponse<ConfigSaveResponse>>('api/config/save', {
     config,
   });
+  if (config.system?.setupPasswordClear) {
+    saveSetupPassword('');
+  } else if (typeof config.system?.setupPassword === 'string' && config.system.setupPassword.trim()) {
+    saveSetupPassword(config.system.setupPassword);
+  }
   return response.data;
 };
 

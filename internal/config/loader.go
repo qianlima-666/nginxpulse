@@ -72,6 +72,7 @@ var (
 		IPGeoCacheLimit:           1000000,
 		IPGeoAPIURL:               DefaultIPGeoAPIURL,
 		DemoMode:                  false,
+		SetupPassword:             "",
 		AccessKeys:                nil,
 		AccessKeyExpireDays:       7,
 		Language:                  "zh-CN",

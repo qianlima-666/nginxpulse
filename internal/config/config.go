@@ -111,6 +111,8 @@ type SystemConfig struct {
 	IPGeoAPIURL               string             `json:"ipGeoApiUrl"`
 	AlertPush                 *AlertPushConfig   `json:"alertPush,omitempty"`
 	DemoMode                  bool               `json:"demoMode"`
+	SetupPassword             string             `json:"setupPassword,omitempty"`
+	SetupPasswordClear        bool               `json:"setupPasswordClear,omitempty"`
 	AccessKeys                []string           `json:"accessKeys"`
 	AccessKeyExpireDays       int                `json:"accessKeyExpireDays"`
 	Language                  string             `json:"language"`

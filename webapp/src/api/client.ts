@@ -3,9 +3,11 @@ import { i18n } from '@/i18n';
 import { getWebBasePathWithSlash } from '@/utils';
 
 export const ACCESS_KEY_STORAGE = 'nginxpulse_access_key';
+export const SETUP_PASSWORD_STORAGE = 'nginxpulse_setup_password';
 const ACCESS_KEY_ISSUED_AT_STORAGE = 'nginxpulse_access_key_issued_at';
 const ACCESS_KEY_EXPIRE_DAYS_STORAGE = 'nginxpulse_access_key_expire_days';
 const ACCESS_KEY_HEADER = 'X-NginxPulse-Key';
+const SETUP_PASSWORD_HEADER = 'X-NginxPulse-Setup-Password';
 const ACCESS_KEY_EVENT = 'nginxpulse:access-key-required';
 const DEFAULT_ACCESS_KEY_EXPIRE_DAYS = 7;
 
@@ -38,6 +40,15 @@ export function saveAccessKey(value: string) {
 export function clearAccessKey() {
   localStorage.removeItem(ACCESS_KEY_STORAGE);
   localStorage.removeItem(ACCESS_KEY_ISSUED_AT_STORAGE);
+}
+
+export function saveSetupPassword(value: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    localStorage.removeItem(SETUP_PASSWORD_STORAGE);
+    return;
+  }
+  localStorage.setItem(SETUP_PASSWORD_STORAGE, normalized);
 }
 
 function ensureAccessKeyIssuedAt() {
@@ -79,6 +90,10 @@ client.interceptors.request.use((config) => {
     }
     config.headers[ACCESS_KEY_HEADER] = accessKey;
   }
+  const setupPassword = localStorage.getItem(SETUP_PASSWORD_STORAGE);
+  if (setupPassword) {
+    config.headers[SETUP_PASSWORD_HEADER] = setupPassword;
+  }
   return config;
 });
 
@@ -89,8 +104,12 @@ client.interceptors.response.use(
     const fallback = i18n.global.t('common.requestFailed');
     const message = error?.response?.data?.error || error?.message || fallback;
     if (status === 401) {
+      const normalized = String(message).toLowerCase();
+      const eventName = normalized.includes('系统配置密码') || normalized.includes('settings password')
+        ? 'nginxpulse:setup-password-required'
+        : ACCESS_KEY_EVENT;
       window.dispatchEvent(
-        new CustomEvent(ACCESS_KEY_EVENT, {
+        new CustomEvent(eventName, {
           detail: { message },
         })
       );

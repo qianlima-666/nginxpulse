@@ -84,6 +84,8 @@ export interface SystemConfig {
   ipGeoCacheLimit?: number;
   alertPush?: Record<string, unknown>;
   demoMode?: boolean;
+  setupPassword?: string;
+  setupPasswordClear?: boolean;
   accessKeys?: string[];
   accessKeyExpireDays?: number;
   language?: string;

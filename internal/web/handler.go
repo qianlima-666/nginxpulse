@@ -28,6 +28,7 @@ type websiteSourceType string
 const (
 	websiteSourceTypeLocal  websiteSourceType = "local"
 	websiteSourceTypeRemote websiteSourceType = "remote"
+	setupPasswordHeader     string            = "X-NginxPulse-Setup-Password"
 )
 
 type websiteInfo struct {
@@ -41,6 +42,33 @@ type websiteInfo struct {
 	Tags              []string `json:"tags"`
 	AutoDiscoverHosts bool     `json:"autoDiscoverHosts"`
 	CustomLabel       string   `json:"customLabel"`
+}
+
+func requireSetupPassword(c *gin.Context, cfg *config.Config) bool {
+	if cfg == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "配置未初始化",
+		})
+		return false
+	}
+	configured := strings.TrimSpace(cfg.System.SetupPassword)
+	if configured == "" {
+		return true
+	}
+	provided := strings.TrimSpace(c.GetHeader(setupPasswordHeader))
+	if provided == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "需要系统配置密码",
+		})
+		return false
+	}
+	if provided != configured {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "系统配置密码无效",
+		})
+		return false
+	}
+	return true
 }
 
 func buildWebsiteInfo(id string, website config.WebsiteConfig) websiteInfo {
@@ -286,6 +314,11 @@ func SetupRoutes(
 			})
 			return
 		}
+		if !requireSetupPassword(c, cfg) {
+			return
+		}
+		cfg.System.SetupPassword = ""
+		cfg.System.SetupPasswordClear = false
 		defaultLogPath := ""
 		if config.IsSetupMode() {
 			defaultLogPath = config.SuggestDefaultLogPath()
@@ -323,6 +356,17 @@ func SetupRoutes(
 			return
 		}
 
+		currentCfg, err := config.ReadRawConfig()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("读取配置失败: %v", err),
+			})
+			return
+		}
+		if !requireSetupPassword(c, currentCfg) {
+			return
+		}
+
 		cfg, err := bindConfigPayload(c)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -330,6 +374,12 @@ func SetupRoutes(
 			})
 			return
 		}
+		if cfg.System.SetupPasswordClear {
+			cfg.System.SetupPassword = ""
+		} else if strings.TrimSpace(cfg.System.SetupPassword) == "" {
+			cfg.System.SetupPassword = currentCfg.System.SetupPassword
+		}
+		cfg.System.SetupPasswordClear = false
 
 		result := config.ValidateConfig(cfg, config.ValidateOptions{
 			CheckPaths: true,
