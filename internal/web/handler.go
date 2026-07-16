@@ -21,6 +21,7 @@ import (
 	"github.com/qianlima-666/nginxpulse/internal/store"
 	"github.com/qianlima-666/nginxpulse/internal/version"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type websiteSourceType string
@@ -62,7 +63,7 @@ func requireSetupPassword(c *gin.Context, cfg *config.Config) bool {
 		})
 		return false
 	}
-	if provided != configured {
+	if err := bcrypt.CompareHashAndPassword([]byte(configured), []byte(provided)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "系统配置密码无效",
 		})
@@ -376,7 +377,16 @@ func SetupRoutes(
 		}
 		if cfg.System.SetupPasswordClear {
 			cfg.System.SetupPassword = ""
-		} else if strings.TrimSpace(cfg.System.SetupPassword) == "" {
+		} else if providedPassword := strings.TrimSpace(cfg.System.SetupPassword); providedPassword != "" {
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(providedPassword), bcrypt.DefaultCost)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "系统配置密码加密失败",
+				})
+				return
+			}
+			cfg.System.SetupPassword = string(hashedPassword)
+		} else {
 			cfg.System.SetupPassword = currentCfg.System.SetupPassword
 		}
 		cfg.System.SetupPasswordClear = false

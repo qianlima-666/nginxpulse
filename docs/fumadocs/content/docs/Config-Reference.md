@@ -53,7 +53,7 @@ title: "完整字段参考"
 - `ipGeoCacheLimit`: IP 归属地缓存上限，默认 1000000。
 - `ipGeoApiUrl`: IP 归属地远端 API 地址，默认 `http://ip-api.com/batch`。自定义 API 需遵循[IP 归属地解析](IP-Geo)中的协议定义。
 - `demoMode`: 是否演示模式，默认 `false`。
-- `setupPassword`: 系统配置页面与配置保存接口的独立密码。留空表示不启用。
+- `setupPassword`: 系统配置页面与配置保存接口的独立密码。保存后以 bcrypt 哈希形式写入配置文件，留空表示不启用；读取配置接口不会返回该值。
 - `setupPasswordClear`: 保存时用于显式清空当前系统配置密码的开关，默认 `false`。
 - `accessKeys`: 访问密钥列表，默认空。
 - `language`: `zh-CN` 或 `en-US`，默认 `zh-CN`。
