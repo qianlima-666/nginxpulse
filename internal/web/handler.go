@@ -45,6 +45,26 @@ type websiteInfo struct {
 	CustomLabel       string   `json:"customLabel"`
 }
 
+func isBcryptHash(value string) bool {
+	_, err := bcrypt.Cost([]byte(value))
+	return err == nil
+}
+
+func hashSetupPassword(password string) (string, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedPassword), nil
+}
+
+func setupPasswordMatches(configured string, provided string) bool {
+	if err := bcrypt.CompareHashAndPassword([]byte(configured), []byte(provided)); err == nil {
+		return true
+	}
+	return !isBcryptHash(configured) && configured == provided
+}
+
 func requireSetupPassword(c *gin.Context, cfg *config.Config) bool {
 	if cfg == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -63,7 +83,7 @@ func requireSetupPassword(c *gin.Context, cfg *config.Config) bool {
 		})
 		return false
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(configured), []byte(provided)); err != nil {
+	if !setupPasswordMatches(configured, provided) {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "系统配置密码无效",
 		})
@@ -378,16 +398,28 @@ func SetupRoutes(
 		if cfg.System.SetupPasswordClear {
 			cfg.System.SetupPassword = ""
 		} else if providedPassword := strings.TrimSpace(cfg.System.SetupPassword); providedPassword != "" {
-			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(providedPassword), bcrypt.DefaultCost)
+			hashedPassword, err := hashSetupPassword(providedPassword)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"error": "系统配置密码加密失败",
 				})
 				return
 			}
-			cfg.System.SetupPassword = string(hashedPassword)
+			cfg.System.SetupPassword = hashedPassword
 		} else {
-			cfg.System.SetupPassword = currentCfg.System.SetupPassword
+			currentPassword := strings.TrimSpace(currentCfg.System.SetupPassword)
+			if currentPassword != "" && !isBcryptHash(currentPassword) {
+				hashedPassword, err := hashSetupPassword(currentPassword)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"error": "系统配置密码加密失败",
+					})
+					return
+				}
+				cfg.System.SetupPassword = hashedPassword
+			} else {
+				cfg.System.SetupPassword = currentCfg.System.SetupPassword
+			}
 		}
 		cfg.System.SetupPasswordClear = false
 

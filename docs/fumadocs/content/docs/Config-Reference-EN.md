@@ -53,7 +53,7 @@ Current behavior:
 - `ipGeoCacheLimit`: max IP geo cache entries, default 1000000.
 - `ipGeoApiUrl`: remote IP geo API URL, default `http://ip-api.com/batch`. Custom APIs must follow the contract in [IP Geo](IP-Geo-EN).
 - `demoMode`: demo mode, default `false`.
-- `setupPassword`: Dedicated password for the Settings page and config-save API. It is stored as a bcrypt hash after saving; empty disables protection, and the config read API never returns the value.
+- `setupPassword`: Dedicated password for the Settings page and config-save API. It is stored as a bcrypt hash after saving; empty disables protection, and the config read API never returns the value. Plaintext passwords saved by older versions still verify and are automatically migrated to hashes on the next config save.
 - `setupPasswordClear`: Explicit switch used on save to clear the current settings password, default `false`.
 - `accessKeys`: access key list, default empty.
 - `language`: `zh-CN` or `en-US`, default `zh-CN`.
